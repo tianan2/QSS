@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r message = FALSE}
 ## calling for libraries
 library(tidyverse)
+library(kableExtra)
 
 star <- read_csv("STAR.csv")
 
@@ -40,6 +41,30 @@ tidied_star %>%
 tidied_star %>% 
   group_by(kinder) %>% 
   summarize_at(vars(g4math, g4reading), quantile, 0.66, na.rm = TRUE)
+
+tidied_star %>% 
+  count(small = sum(yearssmall == 4), 
+        small_regular = sum(yearssmall == 1 & kinder %in% c("regular", "regular_aid")))
+
+tidied_star %>% 
+  group_by(yearssmall) %>% 
+  summarize(avg_math = mean(g4math, na.rm = T), 
+            median_math = median(g4math, na.rm = T), 
+            avg_reading = mean(g4reading, na.rm = T), 
+            median_reading = median(g4reading, na.rm = T)) %>% 
+  kable() %>% 
+  kable_styling()
+        
+  
+tidied_star %>% 
+  mutate(race = ifelse(race == "white", race, "minority")) %>% 
+  group_by(race, kinder) %>% 
+  summarize(avg_math = mean(g4math, na.rm = TRUE),
+            avg_reading = mean(g4reading, na.rm = TRUE))
+
+tidied_star %>% 
+  group_by(kinder) %>% 
+  summarize(avg_hs = mean(hsgrad == 1, na.rm = T))
 
 ```
 
