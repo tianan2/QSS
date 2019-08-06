@@ -1,0 +1,107 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+theme_set(theme_light())
+
+```
+
+```{r}
+mult_by_two <- function (x) {
+  x * 2
+}
+
+values <- c(2, 4, 6)
+n <- length(values)
+result <- rep(NA, n)
+for (i in 1:n) {
+  result[i] <- mult_by_two(values[i])
+}
+print(result)
+
+result <- map(values, mult_by_two)
+result
+## The values of each element is correct, but map function returns a list vector although we are expecting a numeric vector. If we want a numeric vector, use map_dbl. 
+result <- map_dbl(values, mult_by_two)
+result
+
+values2 <- 1:5
+## Using ifelse function
+ifelse(values2 %% 2 == 0, values2 + values2, values2 * values2)
+
+## Using for loop
+n <- length(values2)
+results <- rep(NA, n)
+for (i in 1:n) {
+  if(values2[i] %% 2 == 0) {
+    results[i] <- values2[i] + values2[i]
+  }
+  else{
+    results[i] <- values2[i] * values2[i]
+  }
+} 
+results
+
+## Using map function
+divide_two <- function(x) {
+  if(x %% 2 == 0) {
+    x + x
+  }
+  else{
+    x * x
+  }
+}
+map_dbl(values2, divide_two)
+```
+
+```{r}
+data("polls08", package = "qss")
+data("pres08", package = "qss")
+glimpse(polls08)
+
+library(lubridate)
+
+polls08 <- polls08 %>% 
+  mutate(margin = Obama - McCain, 
+         elec_date = ymd("2008-11-4"), 
+         margin_date = elec_date - middate)
+
+polls08_predict <- polls08 %>% 
+  group_by(state) %>% 
+  filter(margin_date == min(margin_date)) %>% 
+  summarize(avg_margin = mean(margin)) 
+
+pres08 <- pres08 %>% 
+  mutate(margin = Obama - McCain)
+
+pres08_polls <- pres08 %>% 
+  inner_join(polls08_predict, by = "state") %>% 
+  mutate(predict_error = margin - avg_margin)
+
+pres08_polls %>% 
+  ggplot(aes(predict_error, stat(density))) + 
+  geom_histogram(binwidth = 1)
+
+library(ggrepel)
+
+pres08_polls %>% 
+  ggplot(aes(avg_margin, margin)) + 
+  geom_point() +
+  geom_text_repel(aes(label = pres08_polls$state)) +
+  geom_hline(yintercept = 0, color = "gray", size = 1) +
+  geom_vline(xintercept = 0, color = "gray", size = 1)
+  
+
+```
+
+```{r}
+polls08 %>% filter(state == "NY")
+```
+
