@@ -68,22 +68,26 @@ glimpse(polls08)
 
 library(lubridate)
 
-polls08 <- polls08 %>% 
+polls08_processed <- polls08 %>% 
   mutate(margin = Obama - McCain, 
-         elec_date = ymd("2008-11-4"), 
-         margin_date = elec_date - middate)
+         elecdate = ymd("2008-11-4"), 
+         margin_date = elecdate - middate)
 
-polls08_predict <- polls08 %>% 
+polls08_predict <- polls08_processed %>% 
   group_by(state) %>% 
   filter(margin_date == min(margin_date)) %>% 
-  summarize(avg_margin = mean(margin)) 
+  summarize(predict_margin = mean(margin)) 
 
-pres08 <- pres08 %>% 
-  mutate(margin = Obama - McCain)
+pres08_processed <- pres08 %>% 
+  mutate(actual_margin = Obama - McCain)
 
-pres08_polls <- pres08 %>% 
+pres08_polls <- pres08_processed %>% 
   inner_join(polls08_predict, by = "state") %>% 
-  mutate(predict_error = margin - avg_margin)
+  mutate(predict_error = actual_margin - predict_margin)
+
+## regressing actual margin on predict margin
+model <- lm(actual_margin ~ predict_margin, data = pres08_polls)
+summary(model)
 
 pres08_polls %>% 
   ggplot(aes(predict_error, stat(density))) + 
@@ -97,11 +101,193 @@ pres08_polls %>%
   geom_text_repel(aes(label = pres08_polls$state)) +
   geom_hline(yintercept = 0, color = "gray", size = 1) +
   geom_vline(xintercept = 0, color = "gray", size = 1)
-  
 
 ```
 
 ```{r}
-polls08 %>% filter(state == "NY")
+data("pollsUS08", package = "qss")
+
+pollsUS08 <- pollsUS08 %>% 
+  mutate(elecdate = ymd("2008-11-04"), 
+         date_margin = elecdate - middate) 
+
+# empty vectors to store predictions 
+obama_pred <- mccain_pred <- rep(NA, 90)
+for (i in 1:90) {
+  ## take all polls conducted within the past 7 days
+  week_data <- subset(pollsUS08, subset = ((date_margin <= (90 - i + 7)) & (date_margin > (90 - i))))
+  obama_pred[i] <- mean(week_data$Obama)
+  mccain_pred[i] <- mean(week_data$McCain)
+}
+
+tibble(weeks = seq(1, 90, 1), 
+       obama_pred, 
+       mccain_pred) %>% 
+  rename("Obama" = obama_pred,  
+         "McCain" = mccain_pred) %>% 
+  gather(candidate, value, Obama, McCain) %>% 
+  ggplot(aes(weeks, value, color = candidate)) +
+  geom_point(alpha = 0.5, size = 4) +
+  geom_vline(xintercept = 95) +
+  scale_x_continuous(limits = c(0, 90), 
+                     breaks = seq(1, 90, 10), 
+                     labels = seq(90, 1, -10)) +
+  scale_y_continuous(limits = c(35, 60))
+  
 ```
+## different appoach
+```{r}
+pollsUS08
+
+elecdate <- ymd("2008-11-4")
+all_dates <- seq(min(pollsUS08$middate), elecdate, by = "days")
+
+poll_mean <- function (date, .data, days = 7) {
+  filter(.data, 
+         as.integer(middate - date) <= 0, 
+         as.integer(middate - date) > - !!days) %>% 
+  summarize(Obama = mean(Obama), 
+            McCain = mean(McCain)) %>% 
+  mutate(date = !!date)
+}
+
+map_df(all_dates, poll_mean, pollsUS08) %>% 
+  gather(candidate, value, -date) %>% 
+  ggplot(aes(date, value, color = fct_reorder2(candidate, date, value))) +
+  geom_point() +
+  geom_line()
+## Note that the other arguments for poll_mean are placed after the name of the function as additional arguments to map_df
+```
+
+```{r}
+data("face", package = "qss")
+
+face_processed <- face %>% clean_names() %>% 
+  mutate(d_share = d_votes / (d_votes + r_votes), 
+         r_share = r_votes / (d_votes + r_votes), 
+         win_margin = d_share - r_share)
+
+face_processed %>% 
+  ggplot(aes(d_comp, win_margin, color = w_party)) + 
+  geom_point() +
+  geom_smooth(method = "lm") +
+  scale_color_manual("Winning\nparty", 
+                     values = c(D = "blue", 
+                                R = "red"))
+```
+```{r}
+cor(face_processed$d_comp, face_processed$win_margin)
+```
+
+```{r}
+fit <- lm(win_margin ~ d_comp, data = face_processed)
+
+summary(fit)
+```
+```{r}
+data("pres12", package = "qss")
+
+pres_all <- pres12 %>% 
+  mutate(margin = Obama - Romney) %>% 
+  left_join(pres08, by = "state", suffix = c("_12", "_08")) %>% 
+  clean_names() 
+
+pres_all <- pres_all %>% 
+  mutate(obama_08_z = as.numeric(scale(obama_08)), 
+         obama_12_z = as.numeric(scale(obama_12)))
+
+## Check if the regression-to-mean phenomenon exists in the presidential election results in 2008 and 2012
+
+pres_all %>% 
+  filter(obama_08_z <= quantile(obama_08_z, 0.25)) %>% 
+  summarize(margin = mean(obama_12_z > obama_08_z))
+
+pres_all %>% 
+  filter(obama_08_z > quantile(obama_08_z, 0.75)) %>% 
+  summarize(margin = mean(obama_12_z > obama_08_z))
+  
+```
+
+```{r}
+library(broom)
+data("florida", package = "qss")
+
+fit2 <- lm(Buchanan00 ~ Perot96, data = florida)
+fit2
+glance(fit2) %>% 
+  pull(r.squared)
+
+TSS2 <- sum((florida$Buchanan00 - mean(florida$Buchanan00))^2)
+SSR2 <- sum(resid(fit2)^2)
+
+R2 <- function (fit) {
+  resid <- resid(fit)
+  y <- fitted(fit) + resid
+  TSS <- sum((y - mean(y))^2)
+  SSR <- sum(resid^2)
+  R2 <- (TSS - SSR) / TSS
+  return(R2)
+}
+
+R2(fit2)
+
+# creating a residual plot
+augment(fit2) %>% 
+  ggplot(aes(.fitted, .resid)) + 
+  geom_point()
+
+florida %>% 
+  filter(Perot96 == 30739)
+
+# re-compute R2 without the Palm Beach outlier
+florida_without_palmbeach <- florida %>% filter(county != "PalmBeach")
+
+fit3 <- lm(Buchanan00 ~ Perot96, data = florida_without_palmbeach)
+glance(fit3)
+tidy(fit3)
+
+## cheking the improvement of regression lines
+florida %>% ggplot(aes(Perot96, Buchanan00)) + 
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  geom_abline(intercept = 45.84193340, slope = 0.02435217, linetype = "dashed")
+```
+
+```{r}
+data("women", package = "qss")
+
+## checking if the reserved seat is actually occupied by female politicians
+women %>% filter(reserved == 1) %>% 
+  summarize(prop_female = mean(female))
+
+women %>% filter(reserved == 0) %>% 
+  summarize(prop_female = mean(female))
+```
+
+```{r}
+data(list = c("intrade08", "intrade12"), package = "qss")
+
+intrade08_processed <- intrade08 %>% 
+  filter(day == "2008-11-03") %>% 
+  mutate(predicted_winner = ifelse(PriceD > PriceR, "Obama", "McCain")) 
+
+pres08_processed <- pres08 %>% 
+  mutate(actual_winner = ifelse(Obama > McCain, "Obama", "McCain")) %>% 
+  select(state.name, state, actual_winner)
+
+intrade08_processed %>% 
+  left_join(pres08_processed, by = "state") %>% 
+  mutate(classified = ifelse(predicted_winner == actual_winner, "classified", "misclassified")) %>% 
+  filter(classified == "misclassified") %>% 
+  pull(statename)
+
+myfunction <- function (date, .data, days = 1) {
+  filter(day == date - as.Date(days)) %>% 
+  mutate(predicted_winner = ifelse(PriceD > PriceR, "Obama", "McCain"))
+}
+
+myfunction("2008-11-04", intrade08)
+
+```
+
 
