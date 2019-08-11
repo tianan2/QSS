@@ -250,7 +250,29 @@ tidy(fit3)
 florida %>% ggplot(aes(Perot96, Buchanan00)) + 
   geom_point() +
   geom_smooth(method = "lm", se = FALSE) +
-  geom_abline(intercept = 45.84193340, slope = 0.02435217, linetype = "dashed")
+  geom_abline(intercept = 45.84193340, slope = 0.02435217, lty = "dashed")
+
+## different approach
+library(modelr)
+florida_grid <- florida %>% 
+  data_grid(Perot96) %>% 
+  gather_predictions(fit2, fit3) %>% 
+  mutate(model = fct_recode(model, "Regression with Palm Beach" = "fit2", 
+                            "Regression without Palm Beach" = "fit3")) 
+
+ggplot(data = florida, aes(Perot96, Buchanan00)) + 
+  geom_point() +
+  geom_line(data = florida_grid, aes(Perot96, pred, lty = model)) +
+  geom_label(data = filter(florida, county == "PalmBeach"), 
+             mapping = aes(Perot96, Buchanan00, label = county), 
+             vjust = "top", 
+             hjust = "left") +
+  geom_text(data = tibble(label = unique(florida_grid$model), 
+                          x = c(20000, 30000), 
+                          y = c(1200, 450)), 
+            mapping = aes(x = x, y = y, label = label)) +
+  theme(legend.position = "none")
+  
 ```
 
 ```{r}
@@ -262,6 +284,70 @@ women %>% filter(reserved == 1) %>%
 
 women %>% filter(reserved == 0) %>% 
   summarize(prop_female = mean(female))
+```
+
+```{r}
+data("social", package = "qss")
+social_raw <- social_raw %>% mutate(messages = fct_relevel(messages, "Control"))
+fit4 <- lm(primary2006 ~ messages, data = social_raw)
+fit4
+
+social_processed <- social %>% 
+  mutate(Control = as.integer(messages == "Control"), 
+         Hawthorne = as.integer(messages == "Hawthorne"), 
+         Neighbors = as.integer(messages == "Neighbors"))
+
+for (i in unique(social$messages)) {
+  social[[i]] <- as.integer(social[["messages"]] == i)
+}
+
+## calculate average treatment effect (ate)
+ate <- social_raw %>% 
+  group_by(primary2004, messages) %>% 
+  summarize(prop_2006 = mean(primary2006)) %>% 
+  spread(messages, prop_2006) %>% 
+  mutate(ate_Neighbors = Neighbors - Control) 
+
+diff(ate$ate_Neighbors)
+
+```
+
+```{r}
+social_neighbor <- social_raw %>% 
+  filter((messages == "Control") |
+         (messages == "Neighbors")) 
+
+fit5 <- lm(primary2006 ~ primary2004 * messages, data = social_neighbor)
+fit5
+
+social_neighbor <- social_neighbor %>% mutate(age = 2006 - yearofbirth)
+
+fit6 <- lm(primary2006 ~ age * messages, data = social_neighbor)
+fit6
+ate.age <- crossing(age = seq(25, 85, 20), 
+         messages = c("Neighbors", "Control")) %>% 
+  add_predictions(fit6) %>% 
+  spread(messages, pred) %>% 
+  mutate(diff = Neighbors - Control)
+
+fit7 <- lm(primary2006 ~ age + I(age^2) + messages + age:messages + I(age^2):messages, data = social_neighbor)
+fit7
+
+social_neighbor_processed <- social_raw %>% 
+  filter((messages == "Control") |
+         (messages == "Neighbors")) %>% 
+  mutate(age = 2006 - yearofbirth)
+
+social_neighbor_processed %>% 
+  data_grid(age, messages) %>% 
+  filter(messages == "Control" | messages == "Neighbors") %>%
+  add_predictions(fit7) %>% 
+  ggplot(aes(age, pred, color = messages)) +
+  geom_line() +
+  labs(y = "Predicted turnout rates") +
+  theme(legend.position = "bottom", 
+        legend.title = element_blank())
+
 ```
 
 ```{r}
