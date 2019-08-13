@@ -9,6 +9,10 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r message=FALSE, warning=FALSE}
 library(tidyverse)
+library(lubridate)
+library(ggrepel)
+library(broom)
+library(modelr)
 theme_set(theme_light())
 
 ```
@@ -66,48 +70,47 @@ data("polls08", package = "qss")
 data("pres08", package = "qss")
 glimpse(polls08)
 
-library(lubridate)
-
 polls08_processed <- polls08 %>% 
   mutate(margin = Obama - McCain, 
          elecdate = ymd("2008-11-4"), 
          margin_date = elecdate - middate)
 
-polls08_predict <- polls08_processed %>% 
+polls08_predicted <- polls08_processed %>% 
   group_by(state) %>% 
   filter(margin_date == min(margin_date)) %>% 
-  summarize(predict_margin = mean(margin)) 
+  summarize(predicted_margin = mean(margin)) 
 
 pres08_processed <- pres08 %>% 
   mutate(actual_margin = Obama - McCain)
 
-pres08_polls <- pres08_processed %>% 
-  inner_join(polls08_predict, by = "state") %>% 
-  mutate(predict_error = actual_margin - predict_margin)
+pres08_polls08 <- pres08_processed %>% 
+  inner_join(polls08_predicted, by = "state") %>% 
+  mutate(predicted_error = actual_margin - predicted_margin)
 
 ## regressing actual margin on predict margin
-model <- lm(actual_margin ~ predict_margin, data = pres08_polls)
+model <- lm(actual_margin ~ predicted_margin, data = pres08_polls08)
 summary(model)
 
-pres08_polls %>% 
-  ggplot(aes(predict_error, stat(density))) + 
-  geom_histogram(binwidth = 1)
+pres08_polls08 %>% 
+  ggplot(aes(predicted_error, stat(density))) + 
+  geom_histogram(binwidth = 1) 
 
-library(ggrepel)
-
-pres08_polls %>% 
-  ggplot(aes(avg_margin, margin)) + 
+pres08_polls08 %>% 
+  ggplot(aes(predicted_margin, actual_margin)) + 
   geom_point() +
-  geom_text_repel(aes(label = pres08_polls$state)) +
+  xlim(-30, 75) +
+  geom_text_repel(aes(label = pres08_polls08$state)) +
   geom_hline(yintercept = 0, color = "gray", size = 1) +
-  geom_vline(xintercept = 0, color = "gray", size = 1)
+  geom_vline(xintercept = 0, color = "gray", size = 1) + 
+  labs(x = "Poll results", 
+       y = "Actual election results")
 
 ```
 
 ```{r}
 data("pollsUS08", package = "qss")
 
-pollsUS08 <- pollsUS08 %>% 
+pollsUS08_processed <- pollsUS08 %>% 
   mutate(elecdate = ymd("2008-11-04"), 
          date_margin = elecdate - middate) 
 
@@ -115,7 +118,7 @@ pollsUS08 <- pollsUS08 %>%
 obama_pred <- mccain_pred <- rep(NA, 90)
 for (i in 1:90) {
   ## take all polls conducted within the past 7 days
-  week_data <- subset(pollsUS08, subset = ((date_margin <= (90 - i + 7)) & (date_margin > (90 - i))))
+  week_data <- subset(pollsUS08_processed, subset = ((date_margin <= (90 - i + 7)) & (date_margin > (90 - i))))
   obama_pred[i] <- mean(week_data$Obama)
   mccain_pred[i] <- mean(week_data$McCain)
 }
@@ -126,13 +129,22 @@ tibble(weeks = seq(1, 90, 1),
   rename("Obama" = obama_pred,  
          "McCain" = mccain_pred) %>% 
   gather(candidate, value, Obama, McCain) %>% 
+  mutate(candidate = fct_reorder2(candidate, weeks, value)) %>% 
   ggplot(aes(weeks, value, color = candidate)) +
   geom_point(alpha = 0.5, size = 4) +
-  geom_vline(xintercept = 95) +
-  scale_x_continuous(limits = c(0, 90), 
-                     breaks = seq(1, 90, 10), 
-                     labels = seq(90, 1, -10)) +
-  scale_y_continuous(limits = c(35, 60))
+  geom_point(data = tibble(weeks = 91, 
+                           candidate = c("Obama", "McCain"),
+                           value = c(52.93, 45.65)), 
+             aes(weeks, value), size = 4, color = "black") +
+  geom_vline(xintercept = 91, lty = "dashed") +
+  scale_x_continuous(limits = c(0, 91), 
+                     breaks = seq(0, 90, 20), 
+                     labels = seq(90, 0, -20)) +
+  ylim(40, 55) +
+  theme(legend.position = "bottom", 
+        legend.title = element_blank()) + 
+  labs(x = "Days to the election", 
+       y = "Supports for candidates (percentage points)")
   
 ```
 ## different appoach
@@ -338,15 +350,79 @@ social_neighbor_processed <- social_raw %>%
          (messages == "Neighbors")) %>% 
   mutate(age = 2006 - yearofbirth)
 
-social_neighbor_processed %>% 
+y.hat <- social_neighbor_processed %>% 
   data_grid(age, messages) %>% 
   filter(messages == "Control" | messages == "Neighbors") %>%
-  add_predictions(fit7) %>% 
+  add_predictions(fit7) 
+
+y.hat %>% 
   ggplot(aes(age, pred, color = messages)) +
   geom_line() +
   labs(y = "Predicted turnout rates") +
   theme(legend.position = "bottom", 
         legend.title = element_blank())
+
+## Calculating average treatment effect
+y.hat %>% spread(messages, pred) %>% 
+  mutate(pred_ate = Neighbors - Control) %>% 
+  filter(age > 20, age < 90) %>% 
+  ggplot(aes(age, pred_ate)) + 
+  geom_line() +
+  ylim(0, .1) +
+  labs(x = "Age", 
+       y = "Estimated average treatment effect") 
+```
+
+## Regression Discontinuity (RD) Design
+```{r}
+data("MPs", package = "qss")
+mps <- MPs %>% clean_names()
+
+mps_labour <- mps %>% filter(party == "labour")
+mps_tory <- mps %>% filter(party == "tory")
+
+labour_fit1 <- lm(data = filter(mps_labour, margin < 0), ln_net ~ margin)
+labour_fit2 <- lm(data = filter(mps_labour, margin > 0), ln_net ~ margin)
+
+tory_fit1 <- lm(data = filter(mps_tory, margin < 0), ln_net ~ margin)
+tory_fit2 <- lm(data = filter(mps_tory, margin > 0), ln_net ~ margin)
+
+```
+
+```{r}
+## plot separate regression lines for the Labour party
+mps_labour %>% 
+  ggplot(aes(margin, ln_net)) + 
+  geom_point(aes(alpha = .8)) +
+  geom_line(data = augment(labour_fit1), aes(margin, .fitted), color = "red") + 
+  geom_line(data = augment(labour_fit2), aes(margin, .fitted), color = "red") 
+
+mps_tory %>% 
+  ggplot(aes(margin, ln_net)) + 
+  geom_point(aes(alpha = .8)) +
+  geom_line(data = augment(tory_fit1), aes(margin, .fitted), color = "red") + 
+  geom_line(data = augment(tory_fit2), aes(margin, .fitted), color = "red") 
+```
+
+```{r}
+ggplot(mutate(mps, winner = (margin > 0)),
+       aes(x = margin, y = ln_net)) +
+  geom_ref_line(v = 0, size = 2, colour = "gray") +
+  geom_point(alpha = 0.5, size = 2.5) +
+  geom_smooth(method = lm, se = FALSE, mapping = aes(group = winner)) +
+  facet_wrap(~ party) +
+  labs(x = "margin of victory", y = "log net wealth at death")
+```
+
+```{r}
+tory_fit1 <- lm(data = filter(mps_tory, margin < 0), ln_net ~ margin)
+tory_fit2 <- lm(data = filter(mps_tory, margin > 0), ln_net ~ margin)
+
+tory_nonMP <- exp(predict(tory_fit1, newdata = tibble(margin = 0)))
+tory_MP <- exp(predict(tory_fit2, newdata = tibble(margin = 0)))
+
+# calculating estimated causal effect of beng MP in terms of net wealth (pounds)
+tory_MP - tory_nonMP
 
 ```
 
@@ -376,4 +452,62 @@ myfunction("2008-11-04", intrade08)
 
 ```
 
+```{r}
+# question 4.5.3
+data("transfer", package = "qss")
+transfer <- transfer %>% clean_names()
+## 10188, 13584, 16980; create a single variable that characterizes the difference from the closest population cutoff
+transfer_processed <- transfer %>% mutate(diff = case_when(pop82 < 10188 ~ (pop82 - 10188) / 10188, 
+                                     pop82 >= 10188 & pop82 < 11886 ~ (pop82 - 10188) / 10188, 
+                                     pop82 >= 11886 & pop82 < 13584 ~ (pop82 - 13584) / 13584,
+                                     pop82 >= 13584 & pop82 < 15282 ~ (pop82 - 13584) / 13584, 
+                                     pop82 >= 15282 & pop82 < 16980 ~ (pop82 - 16980) / 16980,
+                                     pop82 > 16980 ~ (pop82 - 16980) / 16980)) %>% 
+  mutate(diff = 100 * diff) %>% 
+  filter(diff > -3, diff < 3) 
+  
+
+transfer_processed %>% 
+  gather(indicator, value, educ91, poverty91, literate91) %>% 
+  select(diff, indicator, value) %>% 
+  mutate(indicator = fct_recode(indicator,
+                                "Literacy" = "literate91", 
+                                "Years of education" = "educ91",
+                                "Poverty rate" = "poverty91")) %>% 
+  mutate(receiver = diff > 0) %>% 
+  ggplot(aes(diff, value)) +
+  geom_ref_line(v = 0, size = 2, colour = "gray") +
+  geom_point(alpha = 0.5, size = 2.5) +
+  geom_smooth(method = lm, se = FALSE, mapping = aes(group = receiver)) + 
+  facet_wrap(~ indicator, scales = "free_y") + 
+  labs(x = "Difference from population thresholds for government transfer (percentage point)", 
+       y = "Degree of social welfare")
+
+```
+
+```{r}
+educ_fit1 <- lm(data = filter(transfer_processed, diff < 0), educ91 ~ diff)
+educ_fit2 <- lm(data = filter(transfer_processed, diff > 0), educ91 ~ diff)
+
+poverty_fit1 <- lm(data = filter(transfer_processed, diff < 0), poverty91 ~ diff)
+poverty_fit2 <- lm(data = filter(transfer_processed, diff > 0), poverty91 ~ diff)
+
+literate_fit1 <- lm(data = filter(transfer_processed, diff < 0), literate91 ~ diff)
+literate_fit2 <- lm(data = filter(transfer_processed, diff > 0), literate91 ~ diff)
+
+predict(net_edu_fit2, newdata = tibble(diff = 0)) - predict(net_edu_fit1, newdata = tibble(diff = 0))
+
+## Create a function for calculation
+predict_function <- function (model1, model2) {
+  spread_predictions(data = tibble(diff = 0), 
+                   model1, model2) %>% 
+  mutate(ate = model2 - model1) %>% 
+  pull(ate)
+}
+
+## Calculating average treatment effect for each indicator
+predict_function(educ_fit1, educ_fit2)
+predict_function(poverty_fit1, poverty_fit2)
+predict_function(literate_fit1, literate_fit2)
+```
 
