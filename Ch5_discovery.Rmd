@@ -1,0 +1,91 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(tidytext)
+library(lubridate)
+library(modelr)
+library(tm)
+library(SnowballC)
+library(wordcloud)
+theme_set(theme_light())
+options(scipen = 999)
+```
+
+```{r}
+DIR_SOURCE <- system.file("extdata/federalist", package = "qss")
+corpus_raw <- VCorpus(DirSource(directory = DIR_SOURCE, pattern = "fp"))
+corpus_raw
+```
+
+```{r}
+corpus_tidy <- tidy(corpus_raw, "corpus") %>% 
+  select(id, text) %>% mutate(document = as.integer(str_extract(id, "\\d+"))) %>% 
+  select(-id)
+
+tokens <- corpus_tidy %>% 
+  unnest_tokens(word, text, token = "words") %>% 
+  mutate(word = str_remove(word, "\\d+")) %>% 
+  filter(word != "")
+
+tokens <- tokens %>% anti_join(stop_words, by = "word") 
+dtm <- count(tokens, document, word)
+```
+```{r}
+# Topic discovery
+dtm %>% filter(document == 12) %>% {
+  wordcloud(.$word, .$n, max.words = 20) }
+
+dtm %>% filter(document == 24) %>% {
+  wordcloud(.$word, .$n, max.words = 20)
+}
+
+dtm <- dtm %>% bind_tf_idf(word, document, n) 
+
+# 10 important terms for document 12
+dtm %>% filter(document == 12) %>% 
+  top_n(10, tf_idf)
+# 10 important terms for document 24
+dtm %>% filter(document == 24) %>% 
+  top_n(10, tf_idf)
+
+# Another approach: k-means clustering
+HAMILTON_ESSAYS <- c(1, 6:9, 11:13, 15:17, 21:36, 59:61, 65:85)
+dtm_hamilton <- filter(dtm, document %in% HAMILTON_ESSAYS)
+
+km_out <- kmeans(cast_dtm(dtm_hamilton, document, word, tf_idf), centers = 4, nstart = 10)
+km_out$iter
+
+hamilton_words <-
+  tibble(word = colnames(cast_dtm(dtm_hamilton, document, word, tf_idf)))
+
+dim(km_out$centers)
+km_out$centers
+
+hamilton_words <- bind_cols(hamilton_words, as_tibble(t(km_out$centers)))
+hamilton_words
+
+# Find the top 10 words of each centeroid
+top_words_cluster <- hamilton_words %>% 
+  gather(cluster, value, -word) %>% 
+  group_by(cluster) %>% 
+  top_n(10, value) 
+
+# Print out the top words using for loop
+list <- rep(NA, 10)
+for (i in 1:4) {
+  list <- top_words_cluster$word[top_words_cluster$cluster == i]
+  print(list)
+}
+```
+```{r}
+# 
+```
+
