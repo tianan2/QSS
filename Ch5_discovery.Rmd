@@ -31,13 +31,14 @@ corpus_tidy <- tidy(corpus_raw, "corpus") %>%
   select(-id)
 
 tokens <- corpus_tidy %>% 
-  unnest_tokens(word, text, token = "words") %>% 
+  unnest_tokens(word, text, token = "word_stems") %>% 
   mutate(word = str_remove(word, "\\d+")) %>% 
   filter(word != "")
 
 tokens <- tokens %>% anti_join(stop_words, by = "word") 
 dtm <- count(tokens, document, word)
 ```
+
 ```{r}
 # Topic discovery
 dtm %>% filter(document == 12) %>% {
@@ -55,7 +56,9 @@ dtm %>% filter(document == 12) %>%
 # 10 important terms for document 24
 dtm %>% filter(document == 24) %>% 
   top_n(10, tf_idf)
+```
 
+```{r}
 # Another approach: k-means clustering
 HAMILTON_ESSAYS <- c(1, 6:9, 11:13, 15:17, 21:36, 59:61, 65:85)
 dtm_hamilton <- filter(dtm, document %in% HAMILTON_ESSAYS)
@@ -71,7 +74,9 @@ km_out$centers
 
 hamilton_words <- bind_cols(hamilton_words, as_tibble(t(km_out$centers)))
 hamilton_words
+```
 
+```{r}
 # Find the top 10 words of each centeroid
 top_words_cluster <- hamilton_words %>% 
   gather(cluster, value, -word) %>% 
@@ -79,13 +84,94 @@ top_words_cluster <- hamilton_words %>%
   top_n(10, value) 
 
 # Print out the top words using for loop
-list <- rep(NA, 10)
 for (i in 1:4) {
-  list <- top_words_cluster$word[top_words_cluster$cluster == i]
-  print(list)
+  cat("Cluster", i, ": ", 
+      str_c(top_words_cluster$word[top_words_cluster$cluster == i], collapse = ", "), 
+      "\n"
+  )
 }
+
+# Different approach by using kable
+top_words_cluster %>% 
+  summarize(top_words = str_c(word, collapse = ", ")) %>% 
+  kableExtra::kable()
+```
+
+```{r}
+HAMILTON_ESSAYS <- c(1, 6:9, 11:13, 15:17, 21:36, 59:61, 65:85)
+MADISON_ESSAYS <- c(10, 14, 37:48, 58)
+JAY_ESSAYS <- c(2:5, 64)
+
+known_essays <- bind_rows(tibble(author = "Hamilton", 
+                                 document = HAMILTON_ESSAYS), 
+                          tibble(author = "Madison", 
+                                 document = MADISON_ESSAYS), 
+                          tibble(author = "Jay", 
+                                 document = JAY_ESSAYS))
+
+style_words <- tibble(word = c("although", "always", "commonly", "consequently", "considerable", "enough", "there", "upon", "while", "whilst"))
+
+tokens_selected <- corpus_tidy %>% 
+  unnest_tokens(word, text) %>% 
+  count(document, word) %>%
+  group_by(document) %>% 
+  mutate(count = n / sum(n) * 1000) %>% 
+  select(-n) %>% 
+  inner_join(style_words, by = "word") %>% 
+  left_join(known_essays, by = "document") %>% 
+  spread(word, count, fill = 0) %>% 
+  ungroup()
+
+tokens_spread <- tokens_selected %>% 
+  filter(!is.na(author)) %>% 
+  gather(word, count, -document, -author) %>% 
+  group_by(author, word) %>% 
+  summarize(avg_count = mean(count)) %>% 
+  spread(word, avg_count, fill = 0) %>% 
+  filter(author != "Jay") %>% 
+  ungroup()
+
+hm_words <- tokens_selected %>% 
+  filter(!is.na(author), 
+         author != "Jay") %>% 
+  mutate(author = ifelse(author == "Hamilton", 1, -1)) 
+
+hm_fit <- lm(author ~ upon + there + consequently + whilst, data = hm_words)
+hm_fit
+
+hm_words %>% add_predictions(hm_fit) %>% 
+  mutate(pred_author = if_else(pred >= 0, 1, -1)) 
 ```
 ```{r}
-# 
+# predicting authorship
+tokens_hm <- tokens_selected %>% 
+  filter(!is.na(author), author != "Jay") %>% 
+  add_predictions(hm_fit)
+
+UNNOWN_ESSAYS <- c(49, 50:57, 62, 63)
+disputed <- tibble(author = "Unknown", 
+                   document = UNNOWN_ESSAYS)
+
+tokens_unknown <- corpus_tidy %>% 
+  unnest_tokens(word, text) %>% 
+  count(document, word) %>%
+  group_by(document) %>% 
+  mutate(count = n / sum(n) * 1000) %>% 
+  select(-n) %>% 
+  inner_join(style_words, by = "word") %>% 
+  inner_join(disputed, by = "document") %>% 
+  spread(word, count, fill = 0) %>% 
+  ungroup()
+
+tokens_unknown <- tokens_unknown %>% add_predictions(hm_fit)
+
+tokens_all <- bind_rows(tokens_hm, tokens_unknown)
+  
+tokens_all %>% 
+  ggplot(aes(document, pred, color = author)) +
+  geom_point() 
+
+# Cross-validation; using leave-one-out validation method
+  
 ```
 
