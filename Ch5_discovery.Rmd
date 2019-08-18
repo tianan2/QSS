@@ -143,7 +143,7 @@ hm_words %>% add_predictions(hm_fit) %>%
   mutate(pred_author = if_else(pred >= 0, 1, -1)) 
 ```
 ```{r}
-# predicting authorship
+# predicting authorship of disputed essays
 tokens_hm <- tokens_selected %>% 
   filter(!is.na(author), author != "Jay") %>% 
   add_predictions(hm_fit)
@@ -168,10 +168,70 @@ tokens_unknown <- tokens_unknown %>% add_predictions(hm_fit)
 tokens_all <- bind_rows(tokens_hm, tokens_unknown)
   
 tokens_all %>% 
-  ggplot(aes(document, pred, color = author)) +
-  geom_point() 
+  ggplot(aes(document, pred, color = author, shape = author)) +
+  geom_point(size = 3) +
+  labs(x = "Federalist papers", 
+       y = "Predicted values") +
+  scale_y_continuous(limits = c(-2, 2))
+```
 
+```{r}
 # Cross-validation; using leave-one-out validation method
+crossv_loo <- function(data, id = ".id") {
+  modelr::crossv_kfold(data, k = nrow(data), id = id)
+}
+
+# leave one out cross-validation object
+cv <- hm_words %>%
+  crossv_loo()
+
+models <- purrr::map(cv$train, ~ lm(author ~ upon + there + consequently + whilst,
+                             data = ., model = FALSE))
+
+test <- map2_df(models, cv$test,
+                function(mod, test) {
+                  add_predictions(as.data.frame(test), mod) %>%
+                    mutate(pred_author =
+                             if_else(pred >= 0, "Hamilton", "Madison"),
+                           correct = (pred_author == author))
+                })
+
+test
+
+
+  
+```
+
+```{r}
+## Cross-validation: for loop approach
+n <- nrow(hm_words)
+hm_classify <- rep(NA, n)
+for (i in 1:n) {
+  sub_fit <- lm(author ~ upon + there + consequently + whilst, data = hm_words[-i,  ])
+  hm_classify[i] <- predict(sub_fit, newdata = hm_words[i,  ])
+}
+```
+
+```{r}
+data("constitution", package = "qss")
+
+tokens_all <- constitution %>% 
+  unnest_tokens(word, preamble) %>% 
+  anti_join(stop_words, by = "word") %>% 
+  mutate(word = str_replace_all(word, "\\d+", "")) %>% 
+  filter(word != "")
+
+dtm <- tokens_all %>% count(country, word) 
+dtm_tf <- dtm %>% bind_tf_idf(word, country, n)
+
+dtm %>% filter(country == "united_states_of_america") %>% {
+  wordcloud(.$word, .$n, max.words = 20) }
+
+dtm_tf %>% filter(country == "united_states_of_america") %>% {
+  wordcloud(.$word, .$tf, max.words = 20) }
+
+dtm_tf %>% filter(country == "united_states_of_america") %>% {
+  wordcloud(.$word, .$tf_idf, max.words = 20) }
   
 ```
 
