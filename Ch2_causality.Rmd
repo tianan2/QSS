@@ -1,0 +1,148 @@
+---
+title: "Untitled"
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(stringr)
+library(kableExtra)
+theme_set(theme_light())
+```
+
+# Section 2.5 Observational studies
+```{r}
+# 2.5.1 Minimum age and unemployment
+data("minwage", package = "qss")
+
+# Check if the restaurants in NJ followed the law
+minwage <- minwage %>% 
+  mutate(location = ifelse(location == "PA", location, "NJ")) 
+
+minwage %>% 
+  group_by(location) %>% 
+  summarize(prop_before = mean(wageBefore < 5.05), 
+            prop_after = mean(wageAfter < 5.05))
+
+# Test an economic theory predicting the decrease of full-time workers after the minimum wage increase
+minwage %>% 
+  group_by(location) %>% 
+  summarize(prop_after = mean(fullAfter / (fullAfter + partAfter))) %>% 
+  spread(location, prop_after) %>% 
+  mutate(diff = NJ - PA)
+```
+
+```{r}
+minwage %>% 
+  mutate(wage_diff = wageAfter - wageBefore, 
+         full_diff = fullAfter - fullBefore,
+         part_diff = partAfter - partBefore) %>% 
+  group_by(location, chain) %>% 
+  summarize(avg_wage_diff = mean(wage_diff),
+            avg_full_diff = mean(full_diff), 
+            avg_part_diff = mean(part_diff)) %>% 
+  gather(type, value, -location, -chain) %>% 
+  ggplot(aes(location, value, fill = type)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~ chain) +
+  coord_flip()
+  
+minwage %>% 
+  mutate(location = ifelse(location == "PA", location, "NJ")) %>% 
+  View()
+  group_by(location) %>% 
+  summarize(prop_before = mean(wageBefore < 5.05), 
+            prop_after = mean(wageAfter < 5.05))
+
+minwage %>% 
+  mutate(location = ifelse(location == "PA", location, "NJ")) %>% 
+  group_by(location) %>% 
+  summarize(pct_full_after = mean(fullAfter / (fullAfter + partAfter))) 
+
+## statistical check for the Burgerking effect
+minwage %>% 
+  mutate(location = ifelse(location == "PA", location, "NJ")) %>% 
+  group_by(location) %>% 
+  mutate(before = mean(fullBefore / (fullBefore + partBefore)), 
+            after = mean(fullAfter / (fullAfter + partAfter))) %>%
+  gather(time, value, before, after) %>% 
+  mutate(time = fct_relevel(time, "before", "after")) %>% 
+  ggplot(aes(time, value, color = location)) + 
+  geom_point() + 
+  geom_line(aes(group = location)) + 
+  expand_limits(ymin = 0.25, ymax = 0.35) +
+  theme_classic()
+  
+
+## statistical check for the location effect
+minwage %>% 
+  filter(location %in% c("northNJ", "southNJ", "PA")) %>% 
+  group_by(location) %>% 
+  summarize(pct_full_before = mean(fullBefore / (fullBefore + partBefore)), 
+            pct_full_after = mean(fullAfter / (fullAfter + partAfter)))
+```
+# Section 2.8 Exercises
+
+```{r}
+data("STAR", package = "qss")
+
+star <- STAR
+
+tidied_star <- star %>% 
+  mutate(kinder = recode(classtype, `1` = "small", `2` = "regular", `3` = "regular_aid"), 
+         race = recode(race, `1` = "white", `2` = "black", `4` = "hispanic", .default = "others")) %>% 
+  filter(!is.na(race)) 
+
+## comparing average scores of reading and math tests between small and regular classes
+
+tidied_star %>% 
+  group_by(kinder) %>% 
+  summarize(avg_math = mean(g4math, na.rm = T), 
+            avg_reading = mean(g4reading, na.rm = T))
+
+## compare the standard deviations of the test scores
+
+tidied_star %>% 
+  group_by(kinder) %>% 
+  summarize(sd_math = sd(g4math, na.rm = T), 
+            sd_reading = sd(g4reading, na.rm = T))
+
+## compare the entire range of test scores; a high score and low score
+
+tidied_star %>% 
+  group_by(kinder) %>% 
+  summarize_at(vars(g4math, g4reading), quantile, 0.66, na.rm = TRUE)
+
+tidied_star %>% 
+  count(small = sum(yearssmall == 4), 
+        small_regular = sum(yearssmall == 1 & kinder %in% c("regular", "regular_aid")))
+
+tidied_star %>% 
+  group_by(yearssmall) %>% 
+  summarize(avg_math = mean(g4math, na.rm = T), 
+            median_math = median(g4math, na.rm = T), 
+            avg_reading = mean(g4reading, na.rm = T), 
+            median_reading = median(g4reading, na.rm = T)) %>% 
+  kable() %>% 
+  kable_styling()
+        
+  
+tidied_star %>% 
+  mutate(race = ifelse(race == "white", race, "minority")) %>% 
+  group_by(race, kinder) %>% 
+  summarize(avg_math = mean(g4math, na.rm = TRUE),
+            avg_reading = mean(g4reading, na.rm = TRUE))
+
+tidied_star %>% 
+  group_by(kinder) %>% 
+  summarize(avg_hs = mean(hsgrad == 1, na.rm = T))
+
+```
+```
+

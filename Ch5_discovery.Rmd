@@ -197,8 +197,6 @@ test <- map2_df(models, cv$test,
                 })
 
 test
-
-
   
 ```
 
