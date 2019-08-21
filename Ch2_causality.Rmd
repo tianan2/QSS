@@ -20,9 +20,10 @@ theme_set(theme_light())
 ```{r}
 # 2.5.1 Minimum age and unemployment
 data("minwage", package = "qss")
+minwage_raw <- minwage
 
 # Check if the restaurants in NJ followed the law
-minwage <- minwage %>% 
+minwage <- minwage_raw %>% 
   mutate(location = ifelse(location == "PA", location, "NJ")) 
 
 minwage %>% 
@@ -36,6 +37,34 @@ minwage %>%
   summarize(prop_after = mean(fullAfter / (fullAfter + partAfter))) %>% 
   spread(location, prop_after) %>% 
   mutate(diff = NJ - PA)
+
+minwage %>% 
+  count(location, chain) %>% 
+  group_by(location) %>% 
+  mutate(prop = n / sum(n)) 
+
+minwage %>% 
+  filter(chain == "burgerking") %>% 
+  group_by(location) %>% 
+  summarize(prop_after = mean(fullAfter / (fullAfter + partAfter))) %>% 
+  spread(location, prop_after) %>% 
+  mutate(diff = NJ - PA)
+
+# Before and after effect
+minwage %>% filter(location == "NJ") %>% 
+  summarize(prop_before_after = mean(fullAfter / (fullAfter + partAfter)) - mean(fullBefore / (fullBefore + partBefore)))
+
+# Difference in Differences design
+minwage %>% 
+  group_by(location) %>% 
+  summarize(prop_before = mean(fullBefore / (fullBefore + partBefore)), 
+            prop_after = mean(fullAfter / (fullAfter + partAfter))) %>% 
+  gather(prop, value, -location) %>% 
+  mutate(prop = fct_relevel(prop, "prop_before")) %>% 
+  ggplot(aes(prop, value, group = location, color = location)) +
+  geom_point() +
+  geom_line() 
+
 ```
 
 ```{r}

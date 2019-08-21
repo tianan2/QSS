@@ -13,11 +13,13 @@ library(lubridate)
 library(ggrepel)
 library(broom)
 library(modelr)
+library(janitor)
 theme_set(theme_light())
 
 ```
 
 ```{r}
+# Learning for loop
 mult_by_two <- function (x) {
   x * 2
 }
@@ -300,9 +302,9 @@ women %>% filter(reserved == 0) %>%
 
 ```{r}
 data("social", package = "qss")
-social_raw <- social_raw %>% mutate(messages = fct_relevel(messages, "Control"))
-fit4 <- lm(primary2006 ~ messages, data = social_raw)
-fit4
+social_releveled <- social %>% mutate(messages = fct_relevel(messages, "Control"))
+fit4 <- lm(primary2006 ~ messages, data = social_releveled)
+summary(fit4)
 
 social_processed <- social %>% 
   mutate(Control = as.integer(messages == "Control"), 
@@ -314,7 +316,7 @@ for (i in unique(social$messages)) {
 }
 
 ## calculate average treatment effect (ate)
-ate <- social_raw %>% 
+ate <- social_releveled %>% 
   group_by(primary2004, messages) %>% 
   summarize(prop_2006 = mean(primary2006)) %>% 
   spread(messages, prop_2006) %>% 
@@ -451,6 +453,86 @@ myfunction <- function (date, .data, days = 1) {
 myfunction("2008-11-04", intrade08)
 
 ```
+Question 4.5.2
+```{r}
+# question 4-5-2-1
+data("progresa", package = "qss")
+
+progresa_select <- progresa %>% 
+  select(treatment, t2000, pri2000s) 
+
+progresa_processed <- progresa_select %>% 
+  group_by(treatment) %>% 
+  summarize(avg_turnout = mean(t2000), 
+            avg_support = mean(pri2000s)) 
+
+# difference in means
+mean1 <- progresa_processed$avg_turnout[2] - progresa_processed$avg_turnout[1] 
+mean2 <- progresa_processed$avg_support[2] - progresa_processed$avg_support[1]
+mean1 - mean2
+# 0.6471805
+
+fit_turnout1 <- lm(t2000 ~ treatment, data = progresa_select)
+fit_support1 <- lm(pri2000s ~ treatment, data = progresa_select)
+summary(fit_turnout)
+coef(fit_turnout) - coef(fit_support)
+# 0.6471805
+```
+
+```{r}
+# question 4-5-2-2
+fit_turnout2 <- lm(t2000 ~ treatment + avgpoverty + pobtot1994 + votos1994 + pri1994 + pan1994 + prd1994, data = progresa)
+fit_turnout2
+summary(fit_turnout2)
+
+fit_support2 <- lm(pri2000s ~ treatment + avgpoverty + pobtot1994 + votos1994 + pri1994 + pan1994 + prd1994, data = progresa)
+fit_support2
+summary(fit_support2)
+
+# question 4-5-2-3
+fit_turnout3 <- lm(t2000 ~ treatment + avgpoverty + I(log(pobtot1994)) + pri1994s + pan1994s + prd1994s, data = progresa)
+fit_turnout3
+summary(fit_turnout3)
+
+fit_support3 <- lm(pri2000s ~ treatment + avgpoverty + I(log(pobtot1994)) + pri1994s + pan1994s + prd1994s, data = progresa)
+fit_support3
+summary(fit_support3)
+```
+
+```{r}
+# question 4-5-2-4
+progresa %>% 
+  ggplot(aes(treatment, pobtot1994)) + 
+  geom_boxplot(aes(group = treatment))
+
+progresa %>% 
+  select(treatment, pobtot1994, avgpoverty, t1994, pri1994s) %>% 
+  gather(variables, value, -treatment) %>% 
+  ggplot(aes(treatment, value, group = treatment)) + 
+  geom_boxplot() +
+  facet_wrap(~ variables, scales = "free_y")
+```
+```{r}
+# question 4-5-2-6
+progresa
+fit_turnout4 <- lm(t2000 ~ treatment + I(log(pobtot1994)) + avgpoverty + I(avgpoverty^2) + treatment:avgpoverty + treatment:I(avgpoverty^2), data = progresa)
+fit_turnout4
+summary(fit_turnout4)
+
+fit_support4 <- lm(pri2000s ~ treatment + I(log(pobtot1994)) + avgpoverty + I(avgpoverty^2) + treatment:avgpoverty + treatment:I(avgpoverty^2), data = progresa)
+fit_support4
+summary(fit_support4)
+
+# Estimate the average effects for unique observed values and plot them as a function of the average poverty level. 
+progresa %>% 
+  distinct(treatment, pobtot1994, avgpoverty) %>% 
+  add_predictions(fit_turnout4) %>% 
+  ggplot(aes(avgpoverty, pred)) +
+  geom_line() + 
+  facet_wrap(~ treatment)
+
+progresa %>% count(avgpoverty)
+```
 
 ```{r}
 # question 4.5.3
@@ -465,7 +547,6 @@ transfer_processed <- transfer %>% mutate(diff = case_when(pop82 < 10188 ~ (pop8
                                      pop82 > 16980 ~ (pop82 - 16980) / 16980)) %>% 
   mutate(diff = 100 * diff) %>% 
   filter(diff > -3, diff < 3) 
-  
 
 transfer_processed %>% 
   gather(indicator, value, educ91, poverty91, literate91) %>% 
