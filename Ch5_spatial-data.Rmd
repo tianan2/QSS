@@ -1,0 +1,84 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(ggrepel)
+library(maps)
+theme_set(theme_light())
+options(scipen = 999)
+```
+
+```{r}
+data("us.cities", package = "maps")
+glimpse(us.cities)
+  
+```
+
+```{r}
+usa_map <- map_data("usa")
+capitals <- us.cities %>% filter(capital == 2, 
+                                 !country.etc %in% c("HI", "AK"))
+
+ggplot() + 
+  geom_map(map = usa_map) +
+  borders(database = "usa") +
+  geom_point(data = capitals, aes(long, lat, size = pop)) + 
+  scale_size_area() +
+  coord_quickmap() +
+  labs(title = "US State Capital")
+```
+```{r}
+ca_cities <- filter(us.cities, country.etc == "CA") %>% 
+  arrange(desc(pop)) %>% 
+  slice(1:7) %>% 
+  mutate(name = str_replace_all(name, "CA", ""))
+
+ggplot() + 
+  geom_map(map = usa_map) +
+  borders(database = "state", regions = "California") + 
+  geom_point(data = ca_cities, aes(long, lat)) + 
+  geom_text_repel(data = ca_cities, aes(long, lat, label = name)) + 
+  coord_quickmap()
+
+```
+```{r}
+library(mapdata)
+china_map <- map('china') 
+
+names(china_map)
+length(china_map$x)
+head(cbind(china_map$x, china_map$y))
+```
+# Colors in R
+```{r}
+allcolors <- colors()
+head(allcolors)
+length(allcolors)
+
+red <- rgb(red = 1, green = 0, blue = 0)
+green <- rgb(red = 0, green = 1, blue = 0)
+blue <- rgb(red = 0, green = 0, blue = 1)
+
+black <- rgb(red = 0, green = 0, blue = 0)
+white <- rgb(red = 1, green = 1, blue = 1)
+```
+```{r}
+ggplot(data = tibble(x = rep(1:4, each = 2), 
+       y = x + rep(c(0, 0.2), times = 2), 
+       color = rep(c("black", "red"), each = 4), 
+       alpha = c(1, 1, .5, .5, 1, 1, .5, .5)),
+       aes(x, y, color = color, alpha = alpha)) +
+  geom_point(size = 15) + 
+  scale_color_identity() + 
+  scale_alpha_identity() +
+  theme_bw() +
+  theme(panel.grid = element_blank())
+```
+
