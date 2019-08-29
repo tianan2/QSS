@@ -51,14 +51,23 @@ minwage %>%
   mutate(diff = NJ - PA)
 
 # Before and after effect
+minwage <- minwage %>% 
+  mutate(fullprop_after = fullAfter / (fullAfter + partAfter), 
+         fullprop_before = fullBefore / (fullBefore + partBefore))
+
 minwage %>% filter(location == "NJ") %>% 
-  summarize(prop_before_after = mean(fullAfter / (fullAfter + partAfter)) - mean(fullBefore / (fullBefore + partBefore)))
+  summarize(prop_before_after = mean(fullprop_after) - mean(fullprop_before))
 
 # Difference in Differences design
-minwage %>% 
+minwage_did <- minwage %>% 
   group_by(location) %>% 
-  summarize(prop_before = mean(fullBefore / (fullBefore + partBefore)), 
-            prop_after = mean(fullAfter / (fullAfter + partAfter))) %>% 
+  summarize(prop_before_after = mean(fullprop_after) - mean(fullprop_before)) %>% 
+  spread(location, prop_before_after) 
+
+# Calculating DID
+did <- minwage_did$NJ - minwage_did$PA
+
+minwage_did %>%  
   gather(prop, value, -location) %>% 
   mutate(prop = fct_relevel(prop, "prop_before")) %>% 
   ggplot(aes(prop, value, group = location, color = location)) +

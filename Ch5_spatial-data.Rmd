@@ -22,7 +22,7 @@ glimpse(us.cities)
 ```
 
 ```{r}
-usa_map <- map_data("usa")
+data("usa", package = "maps")
 capitals <- us.cities %>% filter(capital == 2, 
                                  !country.etc %in% c("HI", "AK"))
 
@@ -80,5 +80,38 @@ ggplot(data = tibble(x = rep(1:4, each = 2),
   scale_alpha_identity() +
   theme_bw() +
   theme(panel.grid = element_blank())
+```
+```{r}
+data("pres08", package = "qss")
+df <- pres08 %>% 
+  mutate(state_color = if_else(Obama > McCain, "blue", "red")) %>% 
+  mutate(dem = Obama / (Obama + McCain), 
+         rep = McCain / (Obama + McCain))
+
+ggplot() + 
+  geom_map(map = usa_map) +
+  borders(database = "state", regions = "California", fill = "blue") +
+  coord_quickmap() +
+  theme_void()
+  
+cal_color <- filter(df, state == "CA") %>% {
+    rgb(red = .$rep, green = 0, blue = .$dem)
+}
+
+ggplot() +
+  borders(database = "state", regions = "California", fill = cal_color) +
+  coord_quickmap() +
+  theme_void()
+```
+```{r}
+map(database = "state") 
+
+n <- length(df$state.name)
+state_colors <- rep(NA, n)
+for (i in 1:n) {
+  if (df$dem > df$rep) {
+    
+  }
+}
 ```
 
