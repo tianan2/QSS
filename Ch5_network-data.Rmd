@@ -1,0 +1,38 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(igraph)
+
+data("twitter.following", package = "qss")
+data("twitter.senator", package = "qss")
+
+twitter <- twitter.following
+senators <- twitter.senator
+
+twitter %>% count(following)
+```
+
+```{r}
+as.matrix(twitter)
+twitter_adj <- graph_from_edgelist(as.matrix(twitter))
+```
+```{r}
+# QSS approach
+n <- nrow(senator)
+twitter.adj <- matrix(0, nrow = n, ncol = n)
+colnames(twitter.adj) <- rownames(twitter.adj) <- senators$screen_name 
+for (i in 1:nrow(twitter)) {
+  twitter.adj[twitter$following[i], twitter$followed[i]] <- 1
+} 
+
+twitter.adj
+```
+
