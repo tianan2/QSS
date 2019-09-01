@@ -71,7 +71,6 @@ ggplot(china_map_data, aes(long, lat)) +
 ```{r}
 library(maptools)
 
-
 china_map_2 <- readShapePoly("~/Desktop/china-map-data/gadm36_CHN_0.shp")
 china_map_3 <- readShapePoly("~/Desktop/china-map-data/gadm36_CHN_1.shp")
 china_map_4 <- readShapePoly("~/Desktop/china-map-data/gadm36_CHN_2.shp")
