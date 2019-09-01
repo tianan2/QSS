@@ -22,6 +22,7 @@ glimpse(us.cities)
 ```
 
 ```{r}
+usa_map <- map_data("usa")
 data("usa", package = "maps")
 capitals <- us.cities %>% filter(capital == 2, 
                                  !country.etc %in% c("HI", "AK"))
@@ -55,6 +56,35 @@ china_map <- map('china')
 names(china_map)
 length(china_map$x)
 head(cbind(china_map$x, china_map$y))
+
+china_map_data <- map_data("world") %>% filter(region == "China") 
+
+ggplot() +
+  borders(database = "world", regions = "China", colour = "black") +
+  theme_void()
+
+ggplot(china_map_data, aes(long, lat)) +
+  geom_polygon(aes(group = group), fill = NA, color = "black") +
+  theme_void()
+
+library(maptools)
+library(sf)
+china_map_2 <- readShapePoly("~/Desktop/china-map-data/gadm36_CHN_0.shp")
+china_map_3 <- readShapePoly("~/Desktop/china-map-data/gadm36_CHN_1.shp")
+china_map_4 <- readShapePoly("~/Desktop/china-map-data/gadm36_CHN_2.shp")
+china_map_5 <- readShapePoly("~/Desktop/china-map-data/gadm36_CHN_3.shp")
+
+province <- sf::st_read("~/Desktop/china-map-data/gadm36_CHN_1.shp")
+
+
+class(china_map_2)
+length(china_map_2)
+
+library(broom)
+tidy(china_map_2) %>% 
+  ggplot(aes(long, lat)) +
+  geom_polygon(aes(group = group)) 
+  
 ```
 # Colors in R
 ```{r}
@@ -105,13 +135,56 @@ ggplot() +
 ```
 ```{r}
 map(database = "state") 
-
-n <- length(df$state.name)
-state_colors <- rep(NA, n)
-for (i in 1:n) {
-  if (df$dem > df$rep) {
-    
-  }
+for (i  in 1:nrow(df)) {
+    if ( (df$state[i] != "HI") & (df$state[i] != "AK") &
+        (df$state[i] != "DC")) {
+        map(database = "state", 
+            regions = df$state.name[i],
+            col = ifelse(df$rep[i] > df$dem[i], "red", "blue"),
+            fill = TRUE, 
+            add = TRUE)
+    }
 }
 ```
+```{r}
+map(database = "state") 
+for (i  in 1:nrow(df)) {
+    if ( (df$state[i] != "HI") & (df$state[i] != "AK") &
+        (df$state[i] != "DC")) {
+        ggplot + borders(database = "state", 
+                                    regions = df$state.name[i], 
+                                    fill =  ifelse(df$rep[i] > df$dem[i], "red", "blue")) + 
+        coord_quickmap() + 
+        theme_void()
+    }
+}
+```
+```{r}
+pres08_states <- map_data("state") %>% 
+  left_join(mutate(df, state.name = str_to_lower(state.name)), by = c("region" = "state.name")) %>% 
+  filter(!is.na(state_color)) %>% 
+  mutate(party = ifelse(dem > rep, "dem", "rep"), 
+         color = map2_chr(dem, rep, ~ rgb(blue = .x, red = .y, green = 0)))
+
+ggplot(pres08_states) +
+  geom_polygon(aes(long, lat, group = group, fill = party)) +
+  coord_quickmap() +
+  scale_fill_manual(values = c("dem" = "blue", "rep" = "red")) +
+  theme_void()
+
+ggplot(pres08_states) +
+  geom_polygon(aes(long, lat, group = group, fill = color)) +
+  coord_quickmap() +
+  scale_fill_identity() +
+  theme_void()
+
+# A different, more clearly distinghishable approach
+
+ggplot(pres08_states) +
+  geom_polygon(aes(long, lat, group = group, fill = dem)) +
+  coord_quickmap() +
+  scale_fill_gradient2(low = "red", high = "blue", midpoint = .5) +
+  theme_void()
+```
+
 
