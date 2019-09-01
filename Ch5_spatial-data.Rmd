@@ -66,26 +66,31 @@ ggplot() +
 ggplot(china_map_data, aes(long, lat)) +
   geom_polygon(aes(group = group), fill = NA, color = "black") +
   theme_void()
+```
 
+```{r}
 library(maptools)
-library(sf)
+
+
 china_map_2 <- readShapePoly("~/Desktop/china-map-data/gadm36_CHN_0.shp")
 china_map_3 <- readShapePoly("~/Desktop/china-map-data/gadm36_CHN_1.shp")
 china_map_4 <- readShapePoly("~/Desktop/china-map-data/gadm36_CHN_2.shp")
 china_map_5 <- readShapePoly("~/Desktop/china-map-data/gadm36_CHN_3.shp")
-
-province <- sf::st_read("~/Desktop/china-map-data/gadm36_CHN_1.shp")
-
-
-class(china_map_2)
-length(china_map_2)
-
-library(broom)
-tidy(china_map_2) %>% 
-  ggplot(aes(long, lat)) +
-  geom_polygon(aes(group = group)) 
-  
 ```
+
+```{r}
+library(sf)
+library(viridis)
+library(viridisLite)
+
+province <- st_read("~/Desktop/china-map-data/gadm36_CHN_1.shp")
+city <- st_read("~/Desktop/china-map-data/gadm36_CHN_2.shp")
+county <- st_read("~/Desktop/china-map-data/gadm36_CHN_3.shp")
+
+glimpse(province)
+plot(province['GID_1'])
+```
+
 # Colors in R
 ```{r}
 allcolors <- colors()
