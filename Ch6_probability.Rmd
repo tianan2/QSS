@@ -1,0 +1,57 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r warning=FALSE, message=FALSE}
+library(tidyverse)
+theme_set(theme_light())
+
+```
+
+```{r}
+# The birthday problem: how many people one needs in order for the probability
+# that at least two people have the same birthday to exceed .5
+birthday <- function (k) {
+  logdenom <- k * log(365) + lfactorial(365-k)
+  lognumer <- lfactorial(365)
+  pr <- 1 - exp(lognumer - logdenom) # transform back
+  return (pr)
+}
+
+bday <- tibble(k = 1:50,
+               pr = birthday(k))
+
+ggplot(data = bday, aes(k, pr)) +
+  geom_point() +
+  geom_line() +
+  geom_hline(yintercept = .5, lty = "dashed") +
+  labs(x = "Number of people", 
+       y = "Probability that at least two people have the same birthday")
+
+```
+
+```{r}
+## A simulation approach
+k <- 23
+sims <- 1000
+event <- 0
+for (i in 1:sims) {
+  days <- sample(1:365, k , replace = TRUE)
+  days.unique <- unique(days) 
+  ## if there are duplicates, the number of unique birthdays will be less than
+  ## the number of birthdays, which is "k"
+  if (length(days.unique) < k) {
+    event <- event + 1
+  }
+}
+
+## Fraction of trials where at least two bdays are the same
+answer <- event / sims
+answer
+```
+

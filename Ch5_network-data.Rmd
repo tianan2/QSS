@@ -10,29 +10,166 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r message=FALSE, warning=FALSE}
 library(tidyverse)
 library(igraph)
+library(network)
+library(GGally)
+library(intergraph)
 
 data("twitter.following", package = "qss")
 data("twitter.senator", package = "qss")
 
 twitter <- twitter.following
 senators <- twitter.senator
-
-twitter %>% count(following)
 ```
 
 ```{r}
-as.matrix(twitter)
 twitter_adj <- graph_from_edgelist(as.matrix(twitter))
 ```
+
 ```{r}
 # QSS approach
-n <- nrow(senator)
+n <- nrow(senators)
 twitter.adj <- matrix(0, nrow = n, ncol = n)
+## assign screen names to rows and cols
 colnames(twitter.adj) <- rownames(twitter.adj) <- senators$screen_name 
+## change "0" to "1" when edge goes from node "i" to node "j"
 for (i in 1:nrow(twitter)) {
   twitter.adj[twitter$following[i], twitter$followed[i]] <- 1
 } 
 
 twitter.adj
+## turn the adjacency matrix into an igraph object
+g_twitter <- graph_from_adjacency_matrix(twitter.adj, mode = "directed", diag = FALSE)
+
+## adding degree (in and out) variables to senators data set
+senators <- senators %>% mutate(indgree = degree(g_twitter, mode = "in"), 
+                    outdegree = degree(g_twitter, mode = "out"))
+
+senators %>% arrange(desc(indgree)) %>% slice(1:3)
+senators %>% arrange(desc(outdegree)) %>% slice(1:3)
+
+## adding closeness (in and out) variables to senators data set
+senators <- senators %>% mutate(closeness_in = closeness(g_twitter, mode = "in"), 
+                                closeness_out = closeness(g_twitter, mode = "out"))
+
+theme_set(theme_light())
+senators %>% ggplot(aes(closeness_in, closeness_out)) + 
+  geom_point(aes(color = party, shape = party)) +
+  scale_color_manual(values = c("D" = "blue", "I" = "green", "R" = "red"))
+
+## adding betweenness scores to senators data set
+senators <- senators %>% mutate(betweenness_dir = betweenness(g_twitter, directed = TRUE), 
+                                betweenness_undir = betweenness(g_twitter, directed = FALSE)) 
+
+senators %>% ggplot(aes(betweenness_dir, betweenness_undir)) + 
+  geom_point(aes(color = party, shape = party)) +
+  scale_color_manual(values = c("D" = "blue", "I" = "green", "R" = "red"))
+
+## adding Page-rank vector to senators data set
+page_rank <- page_rank(g_twitter, directed = TRUE)
+senators_final <- senators %>% mutate(page_rank = page_rank[["vector"]])
 ```
 
+## Exercise 5.5.2 International trade network
+```{r}
+# We begin by analyzing trae as an unweighted, directed network. For every year
+# in the data set, create an adjacency matrix whose entry (i, j) equals 1 if
+# country i exports to country j. If this export is zero, then the entry equals
+# 0. We assume that missing data, indicated by NA, represents zero trade. Plot
+# the network density, which is defined over time as network density = number of
+# edges / number of potential edges. The graph.density() function can compute
+# this measure given an adjacency matrix. Briefly interpret the result.
+
+data("trade", package = "qss")
+library(janitor)
+trade <- trade %>% clean_names() %>% filter(!is.na(country1))
+trade %>% count(year, sort = T)
+
+denstiy_year <- function (x) {
+  trade_year <- trade %>% filter(year == x) 
+  n <- n_distinct(trade_year$country1)
+  trade.adj <- matrix(0, nrow = n, ncol = n)
+  colnames(trade.adj) <- rownames(trade.adj) <- unique(trade_year$country1)
+  for (i in 1: nrow(trade_year)) { 
+  if (!is.na(trade_year$exports[i])) {
+    trade.adj[trade_year$country1[i], trade_year$country2[i]] <- 1
+  }
+  }
+  trade_g <- graph_from_adjacency_matrix(trade.adj)
+  graph.density(trade_g)
+}
+
+```
+
+```{r warning=FALSE}
+# For the years 1900, 1955, and 2009, compute the measures of centrality based
+# on degree, betweenness, and closeness (based on total degree) for each year.
+# For each year, list the 5 countries that have the largest values of each of
+# these centrality measures. How do the countries on the lists change over time?
+# Briefly comment on the results
+
+# create a function and igraph object
+trade_g <- function (x) {
+  trade_year <- trade %>% filter(year == x) 
+  n <- n_distinct(trade_year$country1)
+  trade.adj <- matrix(0, nrow = n, ncol = n)
+  colnames(trade.adj) <- rownames(trade.adj) <- unique(trade_year$country1)
+  for (i in 1: nrow(trade_year)) { 
+  if (!is.na(trade_year$exports[i])) {
+    trade.adj[trade_year$country1[i], trade_year$country2[i]] <- 1
+  }
+  }
+  trade_g <- graph_from_adjacency_matrix(trade.adj, mode = "directed")
+  trade_g
+}
+
+centrality_degree <- function (x) {
+  trade %>% 
+  filter(year == x) %>% 
+  distinct(country1) %>% 
+  mutate(degree = degree(trade_g(x), mode = "total"), 
+         closeness = closeness(trade_g(x), mode = "total"), 
+         betweenness = betweenness(trade_g(x), directed = TRUE)) %>% 
+  arrange(desc(degree)) %>% 
+  slice(1:5) %>% 
+  pull(country1)
+}
+
+tibble(rank = seq(1, 5), 
+       "1900" = centrality_degree(1900), 
+       "1955" = centrality_degree(1955), 
+       "2000" = centrality_degree(2000))
+
+centrality_closeness <- function (x) {
+  trade %>% 
+  filter(year == x) %>% 
+  distinct(country1) %>% 
+  mutate(degree = degree(trade_g(x), mode = "total"), 
+         closeness = closeness(trade_g(x), mode = "total"), 
+         betweenness = betweenness(trade_g(x), directed = TRUE)) %>% 
+  arrange(desc(closeness)) %>% 
+  slice(1:5) %>% 
+  pull(country1)
+}
+
+tibble(rank = seq(1, 5), 
+       "1900" = centrality_closeness(1900), 
+       "1955" = centrality_closeness(1955), 
+       "2000" = centrality_closeness(2000))
+
+centrality_betweenness <- function (x) {
+  trade %>% 
+  filter(year == x) %>% 
+  distinct(country1) %>% 
+  mutate(degree = degree(trade_g(x), mode = "total"), 
+         closeness = closeness(trade_g(x), mode = "total"), 
+         betweenness = betweenness(trade_g(x), directed = TRUE)) %>% 
+  arrange(desc(betweenness)) %>% 
+  slice(1:5) %>% 
+  pull(country1)
+}
+
+tibble(rank = seq(1, 5), 
+       "1900" = centrality_betweenness(1900), 
+       "1955" = centrality_betweenness(1955), 
+       "2000" = centrality_betweenness(2000))
+```

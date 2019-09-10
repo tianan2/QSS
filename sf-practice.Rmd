@@ -1,0 +1,68 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(mapdata)
+china_map <- map('china') 
+
+names(china_map)
+length(china_map$x)
+head(cbind(china_map$x, china_map$y))
+
+china_map_data <- map_data("world") %>% filter(region == "China") 
+
+# Create a basic map of china without provincial boundaries
+ggplot() +
+  borders(database = "world", regions = "China", colour = "black") +
+  theme_void()
+
+# A slightly different approach to do the same thing as above 
+ggplot(china_map_data, aes(long, lat)) +
+  geom_polygon(aes(group = group), fill = NA, color = "black") +
+  theme_void()
+```
+
+```{r message=FALSE, warning=FALSE}
+library(sf)
+library(viridis)
+library(viridisLite)
+library(spData)
+library(janitor)
+theme_set(theme_void())
+
+province <- st_read("~/Desktop/china-map-data/gadm36_CHN_1.shp") %>% clean_names()
+city <- st_read("~/Desktop/china-map-data/gadm36_CHN_2.shp") %>% clean_names()
+county <- st_read("~/Desktop/china-map-data/gadm36_CHN_3.shp") %>% clean_names()
+glimpse(province)
+
+shandong <- province %>% filter(name_1 == "Shandong")
+plot(st_geometry(shandong), col = gray, lwd = 3)
+shandong %>% ggplot() + geom_sf(fill = NA)
+
+shandong_city <- city %>% filter(name_1 == "Shandong")
+shandong_city %>% ggplot() + geom_sf(fill = NA)
+
+beijing_city <- county %>% filter(name_1 == "Beijing")
+beijing_city %>% ggplot() + geom_sf(fill = NA)
+```
+
+```{r}
+india <- world %>% filter(name_long == "India")
+world_asia <- world %>% filter(continent == "Asia")
+plot(st_geometry(india), expandBB = c(0, .2, .1, 1), col = "gray", lwd = 3)
+
+china <- world %>% filter(name_long == "China")
+plot(st_geometry(china), expandBB = c(0, .2, .1, 1), col = "gray", lwd = 3)
+plot(world_asia[0], add = TRUE)
+```
+
+```{r}
+
+```
+

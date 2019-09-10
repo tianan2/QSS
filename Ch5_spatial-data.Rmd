@@ -1,6 +1,8 @@
 ---
 title: "Untitled"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
@@ -18,7 +20,6 @@ options(scipen = 999)
 ```{r}
 data("us.cities", package = "maps")
 glimpse(us.cities)
-  
 ```
 
 ```{r}
@@ -47,47 +48,6 @@ ggplot() +
   geom_point(data = ca_cities, aes(long, lat)) + 
   geom_text_repel(data = ca_cities, aes(long, lat, label = name)) + 
   coord_quickmap()
-
-```
-```{r}
-library(mapdata)
-china_map <- map('china') 
-
-names(china_map)
-length(china_map$x)
-head(cbind(china_map$x, china_map$y))
-
-china_map_data <- map_data("world") %>% filter(region == "China") 
-
-ggplot() +
-  borders(database = "world", regions = "China", colour = "black") +
-  theme_void()
-
-ggplot(china_map_data, aes(long, lat)) +
-  geom_polygon(aes(group = group), fill = NA, color = "black") +
-  theme_void()
-```
-
-```{r}
-library(maptools)
-
-china_map_2 <- readShapePoly("~/Desktop/china-map-data/gadm36_CHN_0.shp")
-china_map_3 <- readShapePoly("~/Desktop/china-map-data/gadm36_CHN_1.shp")
-china_map_4 <- readShapePoly("~/Desktop/china-map-data/gadm36_CHN_2.shp")
-china_map_5 <- readShapePoly("~/Desktop/china-map-data/gadm36_CHN_3.shp")
-```
-
-```{r}
-library(sf)
-library(viridis)
-library(viridisLite)
-
-province <- st_read("~/Desktop/china-map-data/gadm36_CHN_1.shp")
-city <- st_read("~/Desktop/china-map-data/gadm36_CHN_2.shp")
-county <- st_read("~/Desktop/china-map-data/gadm36_CHN_3.shp")
-
-glimpse(province)
-plot(province['GID_1'])
 ```
 
 # Colors in R
@@ -115,6 +75,7 @@ ggplot(data = tibble(x = rep(1:4, each = 2),
   theme_bw() +
   theme(panel.grid = element_blank())
 ```
+
 ```{r}
 data("pres08", package = "qss")
 df <- pres08 %>% 
@@ -137,6 +98,7 @@ ggplot() +
   coord_quickmap() +
   theme_void()
 ```
+
 ```{r}
 map(database = "state") 
 for (i  in 1:nrow(df)) {
@@ -150,6 +112,7 @@ for (i  in 1:nrow(df)) {
     }
 }
 ```
+
 ```{r}
 map(database = "state") 
 for (i  in 1:nrow(df)) {
@@ -163,6 +126,7 @@ for (i  in 1:nrow(df)) {
     }
 }
 ```
+
 ```{r}
 pres08_states <- map_data("state") %>% 
   left_join(mutate(df, state.name = str_to_lower(state.name)), by = c("region" = "state.name")) %>% 
@@ -183,12 +147,108 @@ ggplot(pres08_states) +
   theme_void()
 
 # A different, more clearly distinghishable approach
-
 ggplot(pres08_states) +
   geom_polygon(aes(long, lat, group = group, fill = dem)) +
   coord_quickmap() +
   scale_fill_gradient2(low = "red", high = "blue", midpoint = .5) +
   theme_void()
+```
+## Expansion of Walmart
+```{r}
+data("walmart", package = "qss")
+
+# We don't need to worry about colors since ggplot will handles that; 
+ggplot() + 
+  borders(database = "state") +
+  geom_point(data = mutate(walmart, size = ifelse(type == "DistributionCenter", 2.5, 1)), 
+             aes(long, lat, color = type, size = size), 
+             alpha = .5) + 
+  coord_quickmap() +
+  scale_size_identity() +
+  guides(color = guide_legend(override.aes = list(alpha = 1))) +
+  labs(title = "National Distribution of Walmart") +
+  theme_void()
+```
+
+```{r}
+walmart.map <- function (data, year) {
+  walmart_map <- walmart %>% filter(opendate < make_date(year, 1, 1))
+  ggplot() + 
+    borders(database = "state") +
+    geom_point(data = mutate(walmart_map, size = ifelse(type == "DistributionCenter", 2.5, 1)), 
+             aes(long, lat, color = type, size = size), 
+             alpha = .5) + 
+  coord_quickmap() +
+  scale_size_identity() +
+  theme_void() +
+  labs(color = "", 
+       title = year)  
+}
+
+years <- c(1975, 1985, 1995, 2005)
+walk(years, ~ print(walmart.map(walmart, .x)))
+
+```
+## Animate the expansion
+```{r}
+library(gganimate)
+
+ggplot() +
+    borders(database = "state") +
+    geom_point(aes(x = long, y = lat,
+                   colour = type,
+                   fill = type),
+               data = walmart) +
+    coord_quickmap() +
+    theme_void() + 
+    labs(title = "Year: {frame_time}") +
+    transition_time(year(opendate)) 
+```
+
+### Exercise 5-5-3 (Mapping US presidential election over time)
+```{r}
+data("elections", package = "qss")
+elections_joined <- map_data("county") %>% left_join(elections, by = c("subregion" = "county"))
+
+# Begin with MA and AR and visualize the county-level outcome by coloring
+# counties based on the two-party vote share. Use the county database in the
+# maps package. The regions argument of the map function enables us to specify
+# the state and county. The argument accepts a character vector, each entry of
+# which has the syntax state, county. Provide a brief comment.
+elections_filtered <- 
+  elections_joined %>% 
+  mutate(rep_share = rep / (rep + dem), 
+         dem_share = dem / (rep + dem)) %>% 
+  filter(year == 2008)
+
+county_2008 <- function (x) {
+  ggplot() +
+  borders(database = "county", regions = as.character(x)) +
+  geom_polygon(aes(long, lat, group = group, fill = dem_share), 
+               data = filter(elections_filtered, region == as.character(x))) +
+  scale_fill_gradient2(high = "blue", low = "red", midpoint = .5) +
+  coord_quickmap() +
+  theme_void() +
+  ggtitle(str_to_title(as.character(x)))
+}
+
+two_states <- c("massachusetts", "arizona")
+walk(two_states, ~ print(county_2008(.x)))
+
+# subsetting all the states
+states <- unique(elections_filtered$region)
+walk(states, ~ print(county_2008_all(.x)))
+
+# plotting the election results at county level
+ggplot() +
+  borders(database = "county") +
+  geom_polygon(aes(long, lat, group = group, fill = dem_share), 
+               data = filter(elections_filtered, region %in% states)) +
+  scale_fill_gradient2(high = "blue", low = "red", midpoint = .5) +
+  coord_quickmap() +
+  theme_void() + 
+  labs(title = "2008 county-level election results across the United States")
+
 ```
 
 

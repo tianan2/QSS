@@ -70,6 +70,7 @@ hamilton_words <-
   tibble(word = colnames(cast_dtm(dtm_hamilton, document, word, tf_idf)))
 
 dim(km_out$centers)
+class(km_out$centers)
 km_out$centers
 
 hamilton_words <- bind_cols(hamilton_words, as_tibble(t(km_out$centers)))
@@ -210,6 +211,7 @@ for (i in 1:n) {
 }
 ```
 
+## Exercises 5.5.1
 ```{r}
 data("constitution", package = "qss")
 
@@ -231,5 +233,12 @@ dtm_tf %>% filter(country == "united_states_of_america") %>% {
 dtm_tf %>% filter(country == "united_states_of_america") %>% {
   wordcloud(.$word, .$tf_idf, max.words = 20) }
   
+```
+```{r}
+dtm_tf
+km_out_constitution <- kmeans(cast_dtm(dtm_tf, country, word, tf_idf), centers = 5, nstart = 10)
+km_out_constitution$iter
+
+km_out_constitution$centers
 ```
 
