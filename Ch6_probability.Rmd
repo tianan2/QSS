@@ -9,6 +9,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r warning=FALSE, message=FALSE}
 library(tidyverse)
+library(gt)
 theme_set(theme_light())
 
 ```
@@ -53,5 +54,121 @@ for (i in 1:sims) {
 ## Fraction of trials where at least two bdays are the same
 answer <- event / sims
 answer
+```
+
+```{r}
+## A functional approach 
+bdays <- function (k) {
+  days <- sample(1:365, k, replace = TRUE)
+  length(unique(days)) < k
+}
+
+bdays(1)
+bdays(366)
+
+## set the parameters for 1000 simulations, and 23 individuals
+k <- 23
+mean(map_lgl(seq_len(1000), ~ bdays(k)))
+map_lgl(seq_len(1000), ~ bdays(k)) %>% mean()
+
+```
+### 6.2.1 Conditional, marginal, and joint probabilities
+```{r}
+data("FLVoters", package = "qss")
+FLVoters <- FLVoters %>% drop_na()
+## compute the marginal probabilities for race
+race_prop <- FLVoters %>% 
+  count(race) %>% 
+  mutate(prop = n / sum(n))
+
+## compute the marginal probabilities for gender
+gender_prop <- FLVoters %>% 
+  count(gender) %>% 
+  mutate(prop = n / sum(n))
+
+## compute the joint probability of race given gender
+joint_p <- FLVoters %>% 
+  count(gender, race) %>% 
+  mutate(prop = n / sum(n)) %>% 
+  select(-n) %>% 
+  spread(gender, prop)
+  
+## check if it is identical to race_prop above
+margin_race_p <- joint_p %>% 
+  mutate(marginal = f + m) %>% 
+  select(race, marginal)
+
+margin_gender_p <- joint_p %>% summarize(f = sum(f), 
+                      m = sum(m)) %>% mutate(marginal_prob = f + m)
+rownames(margin_gender_p) <- "race"
+```
+
+```{r}
+## adding the third dimension
+FLVoters <- FLVoters %>% mutate(age_group = cut(age, c(0, 20, 40, 60, Inf), 
+                                    right = TRUE, 
+                                    labels = c("<= 20", "20-40", "40-60", "> 60"))) 
+
+joint3 <- FLVoters %>% 
+  count(gender, race, age_group) %>% 
+  mutate(prop = n / sum(n)) %>% 
+  select(-n)
+
+margin_age_p <- FLVoters %>% 
+  count(age_group) %>% 
+  mutate(prop = n / sum(n)) 
+
+joint3 %>% 
+  left_join(select(margin_age_p, age_group, "margin_prop" = prop), by = "age_group") %>% 
+  mutate(cond_prop = prop / margin_prop)
+
+## computing the conditional probability of being black given that a voter is female and above 60 years and calculate the joint capabiity first
+joint_gender_age <- FLVoters %>% count(gender, age_group) %>% 
+  mutate(prop = n / sum(n)) 
+
+joint3 %>% left_join(select(joint_gender_age, gender, age_group, "margin_prop" = prop), by = c("gender", "age_group")) %>% 
+  mutate(cond_prop = prop / margin_prop)
+```
+### 6.2.2 Independence
+```{r}
+## investigate whether race and gender are independent of each other in the
+## sample of Florida registered voters
+joint_race_gender <- FLVoters %>% 
+  count(race, gender) %>% 
+  mutate(prop = n / sum(n))
+
+joint_race_gender %>% left_join(select(race_prop, race, "margin_race" = prop), by = "race") %>%
+  left_join(select(gender_prop, gender, "margin_gender" = prop), by = "gender") %>% 
+  mutate(product = margin_race * margin_gender) %>% 
+  ggplot(aes(product, prop)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, lty = "dashed") +
+  facet_wrap(~ gender) +
+  labs(title = "Independence check", 
+       subtitle = "Race and gender are approximately independent", 
+       x = expression(P("race") * P("gender")),
+       y = expression(P("race and gender"))) 
+
+```
+### 6.2.2 Independence
+```{r}
+## Monty hall problem illustrates how tricky conditional probability and
+## independence can be
+# switching scenario
+monty_problem <- function (.iter) {
+  doors <- c("goat", "goat", "car")
+  first <- sample(1:3, size = 1)
+  remain <- doors[-first]
+  monty <- sample((1:2)[remain == "goat"], size = 1)
+  tibble(.iter = .iter, 
+         result = remain[-monty] == "car")
+}
+
+map_df(seq_len(1000), monty_problem) %>% 
+  summarize(prop = mean(result))
+```
+### 6.2.3 Bayes' rule
+```{r}
+
 ```
 
