@@ -1,0 +1,74 @@
+---
+title: "china-map-practice"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(hchinamap)
+theme_set(theme_light())
+```
+
+```{r}
+dir <- tempdir()
+download.file('https://czxb.github.io/br/chinadf.rda', file.path(dir, 'chinadf.rda'))
+load(file.path(dir, 'chinadf.rda'), verbose = TRUE)
+
+chinadf
+hchinamap(name = chinadf$name, 
+          value = chinadf$value, 
+          region = "China", 
+          width = "100%", 
+          height = "400px", 
+          theme = "darkunica",
+          minColor = "red", 
+          maxColor = "blue")
+```
+
+# China sf data transformation
+
+```{r}
+library(sf)
+library(viridis)
+library(viridisLite)
+library(spData)
+library(janitor)
+theme_set(theme_void())
+
+china_provinces <- st_read("~/Desktop/china-map-data/gadm36_CHN_1.shp") %>% clean_names()
+china_cities <- st_read("~/Desktop/china-map-data/gadm36_CHN_2.shp") %>% clean_names()
+china_counties <- st_read("~/Desktop/china-map-data/gadm36_CHN_3.shp") %>% clean_names()
+```
+
+# China provinces
+
+```{r}
+glimpse(china_provinces)
+
+shandong <- province %>% filter(name_1 == "Shandong")
+plot(st_geometry(shandong), col = gray, lwd = 3)
+shandong %>% ggplot() + geom_sf(fill = NA)
+
+shandong_city <- city %>% filter(name_1 == "Shandong")
+shandong_city %>% ggplot() + geom_sf(fill = NA)
+
+beijing_city <- county %>% filter(name_1 == "Beijing")
+beijing_city %>% ggplot() + geom_sf(fill = NA)
+```
+
+# China cities
+
+```{r}
+glimpse(china_cities)
+```
+
+# China counties
+
+```{r}
+glimpse(china_counties)
+```
+

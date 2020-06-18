@@ -2,7 +2,7 @@
 title: "Untitled"
 output: html_document
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 ```{r setup, include=FALSE}
@@ -36,6 +36,7 @@ ggplot() +
   coord_quickmap() +
   labs(title = "US State Capital")
 ```
+
 ```{r}
 ca_cities <- filter(us.cities, country.etc == "CA") %>% 
   arrange(desc(pop)) %>% 
@@ -63,6 +64,7 @@ blue <- rgb(red = 0, green = 0, blue = 1)
 black <- rgb(red = 0, green = 0, blue = 0)
 white <- rgb(red = 1, green = 1, blue = 1)
 ```
+
 ```{r}
 ggplot(data = tibble(x = rep(1:4, each = 2), 
        y = x + rep(c(0, 0.2), times = 2), 
@@ -104,7 +106,7 @@ map(database = "state")
 for (i  in 1:nrow(df)) {
     if ( (df$state[i] != "HI") & (df$state[i] != "AK") &
         (df$state[i] != "DC")) {
-        map(database = "state", 
+        maps::map(database = "state", 
             regions = df$state.name[i],
             col = ifelse(df$rep[i] > df$dem[i], "red", "blue"),
             fill = TRUE, 
@@ -248,7 +250,32 @@ ggplot() +
   coord_quickmap() +
   theme_void() + 
   labs(title = "2008 county-level election results across the United States")
-
 ```
 
+```{r}
+# In this exercise, we quantify the degree of partisan segregation for each
+# state. We consider a state to be politically segregated if Democrats and
+# Republicans tend to live in different counties. A common way to quantify the
+# degree of residential segregation is to use the dissimilarity index given by.
+# Using data on Democratic and Republican votes from the 2008 presidential
+# election, calculate the dissimilarity index for each state. Which states are
+# among the most (least) segregated according to this measure? Visualize the
+# result as a map. Briefly comment on what you observe.
+
+election_processed <- elections_filtered %>% 
+  distinct(state, subregion, .keep_all = TRUE) %>% 
+  select(state, subregion, everything()) %>% 
+  select(-region) %>% 
+  group_by(state) %>% 
+  mutate(rep_total = sum(rep), 
+         dem_total = sum(dem)) %>% 
+  ungroup()
+
+election_processed %>% 
+  mutate(dis_index = sum(abs((dem / dem_total) - (rep / rep_total))) / 2)
+  
+dis_index <- function (county) {
+  sum(abs(dem / dem_sum - rep / rep_sum)) / 2
+}
+```
 

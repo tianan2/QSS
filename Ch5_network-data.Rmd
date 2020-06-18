@@ -84,7 +84,7 @@ library(janitor)
 trade <- trade %>% clean_names() %>% filter(!is.na(country1))
 trade %>% count(year, sort = T)
 
-denstiy_year <- function (x) {
+density_year <- function (x) {
   trade_year <- trade %>% filter(year == x) 
   n <- n_distinct(trade_year$country1)
   trade.adj <- matrix(0, nrow = n, ncol = n)
@@ -98,6 +98,9 @@ denstiy_year <- function (x) {
   graph.density(trade_g)
 }
 
+density_year(1940)
+# create a plot of density for every year
+  
 ```
 
 ```{r warning=FALSE}
@@ -133,6 +136,7 @@ centrality_degree <- function (x) {
   slice(1:5) %>% 
   pull(country1)
 }
+
 
 tibble(rank = seq(1, 5), 
        "1900" = centrality_degree(1900), 

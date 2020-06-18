@@ -16,6 +16,7 @@ length(china_map$x)
 head(cbind(china_map$x, china_map$y))
 
 china_map_data <- map_data("world") %>% filter(region == "China") 
+china_map_data
 
 # Create a basic map of china without provincial boundaries
 ggplot() +
@@ -28,6 +29,8 @@ ggplot(china_map_data, aes(long, lat)) +
   theme_void()
 ```
 
+# draw a china map with city borders
+
 ```{r message=FALSE, warning=FALSE}
 library(sf)
 library(viridis)
@@ -35,6 +38,8 @@ library(viridisLite)
 library(spData)
 library(janitor)
 theme_set(theme_void())
+
+china <- world %>% filter(name_long == "China")
 
 province <- st_read("~/Desktop/china-map-data/gadm36_CHN_1.shp") %>% clean_names()
 city <- st_read("~/Desktop/china-map-data/gadm36_CHN_2.shp") %>% clean_names()
@@ -50,19 +55,47 @@ shandong_city %>% ggplot() + geom_sf(fill = NA)
 
 beijing_city <- county %>% filter(name_1 == "Beijing")
 beijing_city %>% ggplot() + geom_sf(fill = NA)
+plot(st_geometry(beijing_city), expandBB = c(2, .2, .1, 1), col = "grey", lwd = 3)
+plot(china[0], add = TRUE)
+
 ```
 
 ```{r}
 india <- world %>% filter(name_long == "India")
-world_asia <- world %>% filter(continent == "Asia")
 plot(st_geometry(india), expandBB = c(0, .2, .1, 1), col = "gray", lwd = 3)
 
+world_asia <- world %>% filter(continent == "Asia")
+world_eurasia <- world %>% filter(continent %in% c("Asia", "Europe"))
+
 china <- world %>% filter(name_long == "China")
-plot(st_geometry(china), expandBB = c(0, .2, .1, 1), col = "gray", lwd = 3)
-plot(world_asia[0], add = TRUE)
+plot(st_geometry(china), main = "China", expandBB = c(0, .01, 0, -.5), col = "gray", lwd = 3)
+plot(world_eurasia[0], add = TRUE)
+
+indonesia <- world %>% filter(name_long == "Indonesia")
+plot(st_geometry(indonesia), expandBB = c(0, 0, .1, .5), col = "gray", lwd = 3)
+plot(st_geometry(world_asia), add = TRUE)
 ```
 
 ```{r}
+library(maps)
+library(sf)
 
+map("", ".", names = TRUE, plot = TRUE)
+map("world", "China") %>% 
+map.cities(country = "China", capitals = 2)
+
+dt <- ggplot2::map_data('china')
+```
+```{r}
+world
+china
+
+ggplot(data = world) +
+  geom_sf(color = "black", aes(fill = log(gdpPercap))) +
+  labs(title = "World Map", 
+       subtitle = "219 countries")
+
+ggplot(data = china) +
+  geom_sf(color = "black")
 ```
 

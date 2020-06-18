@@ -1,0 +1,44 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(moderndive)
+library(skimr)
+library(kableExtra)
+theme_set(theme_light())
+
+evals %>% glimpse()
+```
+
+```{r}
+evals_ch6 <- evals %>% 
+  select(ID, score, age, gender)
+
+evals_ch6 %>% sample_n(size = 5)
+
+evals_ch6 %>% 
+  select(score, age, gender) %>% 
+  skim()
+
+evals_ch6 %>% 
+  get_correlation(formula = score ~ age)
+```
+```{r}
+evals_ch6 %>% 
+  ggplot(aes(age, score, color = gender)) +
+  geom_point() +
+  geom_smooth(se = F)
+```
+```{r}
+score_model_interaction <- lm(score ~ age * gender, data = evals_ch6)
+
+score_model_interaction %>% get_regression_table()
+```
+

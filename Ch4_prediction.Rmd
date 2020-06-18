@@ -184,10 +184,18 @@ face_processed <- face %>% clean_names() %>%
 face_processed %>% 
   ggplot(aes(d_comp, win_margin, color = w_party)) + 
   geom_point() +
-  geom_smooth(method = "lm") +
-  scale_color_manual("Winning\nparty", 
+  scale_color_manual(name = "Winning\nparty", 
                      values = c(D = "blue", 
-                                R = "red"))
+                                R = "red")) +
+  scale_x_continuous(name = "Competence scores for Democrats", 
+                     limits = c(0, 1)) +
+  scale_y_continuous(name = "Democratic margin in vote shares", 
+                     limits = c(-1, 1)) +
+  ggtitle(label = "Facial competence and vote share") +
+  theme(plot.title = element_text(face = "bold", hjust = .5, size = 14))
+
+## The upwards-slopig data cloud shows that there is a positive correlation
+## between perceived competence and vote share differential
 ```
 ```{r}
 cor(face_processed$d_comp, face_processed$win_margin)

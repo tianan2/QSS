@@ -169,6 +169,45 @@ map_df(seq_len(1000), monty_problem) %>%
 ```
 ### 6.2.3 Bayes' rule
 ```{r}
+data("cnames", package = "qss")
+names <- read_csv("names.csv")
+glimpse(names)
 
+## remove voters whose surnames do not appear in the census surname list
+FLVoters <- FLVoters[!is.na(match(FLVoters$surname, names$surname)), ]
+FLVoters <- FLVoters %>% filter(!is.na(race))
+
+## find the most-likely race for a given surname
+names_filtered <- names %>% 
+  select(-count) %>% 
+  gather(race, prop, - surname) %>% 
+  group_by(surname) %>% 
+  mutate(max_race = max(prop)) %>% 
+  filter(prop == max_race) %>% 
+  mutate(race = str_replace(race, "pct", "")) %>% 
+  select(- prop, - max_race) %>% 
+  ungroup() %>% 
+  mutate(race = recode(race, api = "asian", 
+                       others = "other"))
+
+## compute the proportion of voters whose race is correctly classified in each
+## racial category
+mutate_FL <- FLVoters %>% 
+  inner_join(names_filtered, by = "surname") %>%
+  mutate(identical = ifelse(race.x == race.y, 1, 0))
+
+mutate_FL %>%
+  group_by(race.x) %>% 
+  summarize(tp = mean(identical))
+
+## investigate how the knowledge of residence location improve the prediction of
+## individual race
+## compute P(race | surname and residence)
+
+data("FLCensus", package = "qss")
+mutate_FL %>% inner_join(FLCensus, by = c("county", "VTD")) 
+  
+
+  
 ```
 
