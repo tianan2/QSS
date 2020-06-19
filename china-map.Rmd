@@ -47,7 +47,12 @@ china_counties <- st_read("~/Desktop/china-map-data/gadm36_CHN_3.shp") %>% clean
 # China provinces
 
 ```{r}
-glimpse(china_provinces)
+glimpse(china_provinces) 
+
+ggplot(data = china_provinces) +
+  geom_sf(color = "black")
+
+
 
 shandong <- province %>% filter(name_1 == "Shandong")
 plot(st_geometry(shandong), col = gray, lwd = 3)
@@ -63,7 +68,7 @@ beijing_city %>% ggplot() + geom_sf(fill = NA)
 # China cities
 
 ```{r}
-glimpse(china_cities)
+china_cities %>% View()
 ```
 
 # China counties
