@@ -42,38 +42,66 @@ theme_set(theme_void())
 china_provinces <- st_read("~/Desktop/china-map-data/gadm36_CHN_1.shp") %>% clean_names()
 china_cities <- st_read("~/Desktop/china-map-data/gadm36_CHN_2.shp") %>% clean_names()
 china_counties <- st_read("~/Desktop/china-map-data/gadm36_CHN_3.shp") %>% clean_names()
+
+provinces_raw <- st_read("~/Desktop/china-map-data/province.shp") %>% clean_names()
 ```
 
-# China provinces
+# China provinces: data cleaning
 
 ```{r}
-glimpse(china_provinces) 
+provinces <- provinces_raw %>% 
+  separate(name_pingy, c("name", "status"), sep = " ") %>% 
+  mutate(status = replace_na(status, "SAR"), 
+         status = fct_recode(status, 
+                         "City" = "Shi", 
+                         "Province" = "Sheng", 
+                         "Autonomous Region" = "Zizhiqu"))
 
-ggplot(data = china_provinces) +
-  geom_sf(color = "black")
+china_provinces_df <- china_provinces %>% st_drop_geometry()
+```
 
+## Attribute data operations
 
+```{r}
+china_provinces_df %>% 
+  mutate(nl_name_1 = str_replace(nl_name_1, "\\|", "/")) %>% 
+  separate(nl_name_1, c("chinese_1", "chinese_2"), sep = "/")
+```
 
-shandong <- province %>% filter(name_1 == "Shandong")
+```{r}
+plot(st_geometry(china_provinces))
+plot(st_geometry(china_provinces %>% filter(engtype_1 == "Autonomous Region")), col = "grey", add = TRUE)
+
+plot(china_provinces["engtype_1"])
+ggplot(data = provinces) + geom_sf()
+```
+
+```{r}
+shandong <- china_provinces %>% filter(name_1 == "Shandong")
 plot(st_geometry(shandong), col = gray, lwd = 3)
-shandong %>% ggplot() + geom_sf(fill = NA)
+ggplot() + geom_sf(data = shandong)
 
-shandong_city <- city %>% filter(name_1 == "Shandong")
-shandong_city %>% ggplot() + geom_sf(fill = NA)
+shandong_city <- china_cities %>% filter(name_1 == "Shandong")
+ggplot() + geom_sf(data = shandong_city)
 
-beijing_city <- county %>% filter(name_1 == "Beijing")
-beijing_city %>% ggplot() + geom_sf(fill = NA)
+beijing_city <- china_counties %>% filter(name_1 == "Beijing")
+ggplot() + geom_sf(data = beijing_city)
 ```
 
 # China cities
 
 ```{r}
-china_cities %>% View()
+china_cities
+
+plot(st_geometry(china_cities))
+plot(china_cities["name_1"])
 ```
 
 # China counties
 
 ```{r}
-glimpse(china_counties)
+china_counties
+
+plot(st_geometry(china_counties))
 ```
 
