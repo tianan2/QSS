@@ -40,8 +40,11 @@ library(janitor)
 theme_set(theme_void())
 
 china <- world %>% filter(name_long == "China")
+taiwan <-  world %>% filter(name_long == "Taiwan")
 
-plot(st_geometry(china))
+plot(st_geometry(china), col = "grey", lwd = 3)
+plot(st_geometry(taiwan), col = "red", lwd = 3, add = TRUE)
+plot(st_geometry(world_asia), add = TRUE)
 ```
 
 ```{r}
@@ -58,6 +61,12 @@ plot(world_eurasia[0], add = TRUE)
 indonesia <- world %>% filter(name_long == "Indonesia")
 plot(st_geometry(indonesia), expandBB = c(0, 0, .1, .5), col = "gray", lwd = 3)
 plot(st_geometry(world_asia), add = TRUE)
+
+myanmar <- world %>% filter(name_long == "Myanmar")
+plot(st_geometry(myanmar), expandBB = c(1, -.5, .7, 0), col = "gray", lwd = 3)
+plot(st_geometry(world_asia), add = TRUE)
+
+
 ```
 
 ```{r}

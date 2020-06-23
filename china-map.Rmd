@@ -37,6 +37,7 @@ library(viridis)
 library(viridisLite)
 library(spData)
 library(janitor)
+library(readxl)
 theme_set(theme_void())
 
 china_provinces <- st_read("~/Desktop/china-map-data/gadm36_CHN_1.shp") %>% clean_names()
@@ -44,6 +45,8 @@ china_cities <- st_read("~/Desktop/china-map-data/gadm36_CHN_2.shp") %>% clean_n
 china_counties <- st_read("~/Desktop/china-map-data/gadm36_CHN_3.shp") %>% clean_names()
 
 provinces_raw <- st_read("~/Desktop/china-map-data/province.shp") %>% clean_names()
+
+province_data <- read_excel("~/Desktop/province_data.xlsx") %>% mutate(location = fct_recode(location, "Ningxia Hui" = "Ningxia", "Xizang" = "Tibet", "Xinjiang Uygur" = "Xinjiang"))
 ```
 
 # China provinces: data cleaning
@@ -56,21 +59,32 @@ provinces <- provinces_raw %>%
                          "City" = "Shi", 
                          "Province" = "Sheng", 
                          "Autonomous Region" = "Zizhiqu"))
+provinces %>% st_drop_geometry()
+```
 
-china_provinces_df <- china_provinces %>% st_drop_geometry()
+```{r}
+china_provinces_df <- china_provinces %>% st_drop_geometry() %>% mutate(nl_name_1 = str_replace(nl_name_1, "\\|", "/")) %>% 
+  separate(nl_name_1, c("chinese_1", "chinese_2"), sep = "/")
+
+china_provinces_data <- china_provinces_df %>% left_join(province_data, by = c("name_1" = "location"))
+
+china_provinces_data_geometry <- cbind(china_provinces_data, china_provinces$geometry)
+
+# Convert data.frame into sf object
+china_provinces_data_sf <- st_sf(china_provinces_data_geometry)
+plot(china_provinces_data_sf["gdp_percapita"])
+
 ```
 
 ## Attribute data operations
 
 ```{r}
-china_provinces_df %>% 
-  mutate(nl_name_1 = str_replace(nl_name_1, "\\|", "/")) %>% 
-  separate(nl_name_1, c("chinese_1", "chinese_2"), sep = "/")
+china_provinces_df %>% View()
 ```
 
 ```{r}
 plot(st_geometry(china_provinces))
-plot(st_geometry(china_provinces %>% filter(engtype_1 == "Autonomous Region")), col = "grey", add = TRUE)
+plot(st_geometry(china_provinces %>% filter(engtype_1 == "Autonomous Region")), col = "blue", add = TRUE)
 
 plot(china_provinces["engtype_1"])
 ggplot(data = provinces) + geom_sf()
