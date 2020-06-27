@@ -70,9 +70,6 @@ plot(st_geometry(world_asia), add = TRUE)
 ```
 
 ```{r}
-library(maps)
-library(sf)
-
 map("", ".", names = TRUE, plot = TRUE)
 map("world", "China") %>% 
 map.cities(country = "China", capitals = 2)
@@ -84,6 +81,8 @@ nc <- st_read(system.file("gpkg/nc.gpkg", package="sf"), quiet = TRUE)
 plot(nc)
 ```
 ```{r}
-plot(nc["SID79"])
+library(patchwork)
+
+
 
 ```

@@ -41,10 +41,12 @@ library(readxl)
 theme_set(theme_void())
 
 china_provinces <- st_read("~/Desktop/china-map-data/gadm36_CHN_1.shp") %>% clean_names()
+object.size(china_provinces)
+
 china_cities <- st_read("~/Desktop/china-map-data/gadm36_CHN_2.shp") %>% clean_names()
 china_counties <- st_read("~/Desktop/china-map-data/gadm36_CHN_3.shp") %>% clean_names()
 
-provinces_raw <- st_read("~/Desktop/china-map-data/province.shp") %>% clean_names()
+provinces_raw <- st_read("~/Desktop/china-map-data/CHGIS_V4_1997_PROV_PGN.shp") %>% clean_names()
 
 province_data <- read_excel("~/Desktop/province_data.xlsx") %>% mutate(location = fct_recode(location, "Ningxia Hui" = "Ningxia", "Xizang" = "Tibet", "Xinjiang Uygur" = "Xinjiang"))
 ```
@@ -52,15 +54,14 @@ province_data <- read_excel("~/Desktop/province_data.xlsx") %>% mutate(location 
 # China provinces: data cleaning
 
 ```{r}
-provinces <- provinces_raw %>% 
-  separate(name_pingy, c("name", "status"), sep = " ") %>% 
-  mutate(status = replace_na(status, "SAR"), 
-         status = fct_recode(status, 
-                         "City" = "Shi", 
-                         "Province" = "Sheng", 
-                         "Autonomous Region" = "Zizhiqu"))
+provinces_raw
+plot(st_geometry(provinces_raw))
+ggplot(data = provinces_raw) +
+  geom_sf()
+
 provinces %>% st_drop_geometry()
 ```
+
 
 ```{r}
 china_provinces_df <- china_provinces %>% st_drop_geometry() %>% mutate(nl_name_1 = str_replace(nl_name_1, "\\|", "/")) %>% 
@@ -108,7 +109,29 @@ ggplot() + geom_sf(data = beijing_city)
 china_cities
 
 plot(st_geometry(china_cities))
-plot(china_cities["name_1"])
+plot(china_cities["type_2"])
+
+anhui <- china_cities %>% filter(name_1 == "Anhui")
+glimpse(anhui)
+plot(st_geometry(anhui), expandBB = c(2.5, 2, 3.5, 3.5), col = "red", lwd = 3)
+plot(st_geometry(china_cities), add = TRUE)
+```
+
+```{r}
+ggplot(data = anhui, aes(fill = engtype_2)) +
+  geom_sf() +
+  geom_sf_text(aes(label = name_2)) +
+  # 経緯度線を入れない
+  coord_sf(datum = NA) +
+  guides(fill = F) +
+  theme_void() 
+```
+
+```{r}
+library(tmap)
+
+qtm(anhui)
+qtm(china_provinces)
 ```
 
 # China counties
@@ -117,5 +140,9 @@ plot(china_cities["name_1"])
 china_counties
 
 plot(st_geometry(china_counties))
+```
+
+```{r}
+
 ```
 
